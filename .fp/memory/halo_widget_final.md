@@ -1,8 +1,8 @@
 ---
 name: halo_widget_final
-description: HALO v0.10 — 完整体检映射手册(磁盘/CPU/内存/GPU/网络)
+description: HALO v0.10 — 系统数据光环映射手册(磁盘/CPU/内存/GPU/网络)
 type: project
-created: 2026-07-31 00:52
+created: 2026-07-31 01:14
 ---
 
 # HALO v0.10 — 完整设计文档

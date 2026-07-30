@@ -1,6 +1,6 @@
 ---
 name: halo_plasma_widget
-description: HALO 液压联动光环 KDE Plasma 5 桌面小部件
+description: HALO 系统数据光环 KDE Plasma 5 桌面小部件
 type: project
 created: 2026-07-30 19:17
 ---
