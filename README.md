@@ -19,18 +19,24 @@
 ## 安装
 
 ```bash
-# 克隆
-git clone git@github.com:zpb911km/fp-halo.git
-cd fp-halo
-
-# 安装到 Plasma
-cp -r . ~/.local/share/plasma/plasmoids/org.zpb.halo/
+# 方法一：从 GitHub 克隆（推荐）
+git clone https://github.com/zpb911km/fp-halo.git
+mkdir -p ~/.local/share/plasma/plasmoids/org.zpb.halo/
+cp -r fp-halo/contents fp-halo/metadata.* ~/.local/share/plasma/plasmoids/org.zpb.halo/
 
 # 重启 Plasma
 killall plasmashell && plasmashell --replace & disown
 ```
 
 然后在桌面右键 → 添加小部件 → 搜索 **HALO** → 拖到桌面。
+
+### 方法二：`.plasmoid` 一键安装
+
+下载 `org.zpb.halo.plasmoid` 文件，双击或拖到桌面上即可自动安装。
+
+```bash
+plasmapkg2 -i org.zpb.halo.plasmoid
+```
 
 ## 颜色定制
 
