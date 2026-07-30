@@ -1,6 +1,6 @@
 // ================================================================
 // HALO — 液压联动光环 | KDE Plasma 5 Widget
-// version v0.8
+// version v0.9
 // ================================================================
 
 import QtQuick 2.15
@@ -33,7 +33,7 @@ Item {
         readonly property real gap:       3
         readonly property real minThick:  1.5
         readonly property real maxR:      195
-        readonly property string version: "v0.8"
+        readonly property string version: "v0.9"
 
         // ─── 2b. per-layer animation config ─────────────────────
         readonly property var layerConf: [
@@ -124,7 +124,17 @@ Item {
         property var  t0:       0
         property bool stReady:  false
 
-        // ─── 2e. animation math functions ───────────────────────
+        // ─── 2e. color helpers (hex with optional alpha) ────────
+        function parseColor(hex) {
+            hex = hex.replace('#', '');
+            var r = parseInt(hex.substr(0, 2), 16);
+            var g = parseInt(hex.substr(2, 2), 16);
+            var b = parseInt(hex.substr(4, 2), 16);
+            var a = hex.length >= 8 ? parseInt(hex.substr(6, 2), 16) / 255 : 1.0;
+            return Qt.rgba(r / 255, g / 255, b / 255, a);
+        }
+
+        // ─── 2f. animation math functions ───────────────────────
 
         /* cubic‑bezier solver (0,0)–(0.4,0.2)–(1,1) */
         function cb(t) {
@@ -267,7 +277,7 @@ Item {
             }
         }
 
-        // ─── 2f. Canvas renderer ────────────────────────────────
+        // ─── 2g. Canvas renderer ────────────────────────────────
         Canvas {
             id: cv
             anchors.fill: parent
@@ -301,7 +311,7 @@ Item {
                     }
 
                     // colour & opacity
-                    ctx.strokeStyle = getColor(i);
+                    ctx.strokeStyle = parseColor(getColor(i));
                     ctx.lineWidth   = sw;
                     ctx.globalAlpha = ev(flickerKfs[i],
                                          (el % layerConf[i].fMs) / layerConf[i].fMs);
@@ -334,7 +344,7 @@ Item {
             }
         }
 
-        // ─── 2g. version badge ──────────────────────────────────
+        // ─── 2h. version badge ──────────────────────────────────
         Text {
             anchors.left:   parent.left
             anchors.top:    parent.top
@@ -348,7 +358,7 @@ Item {
             opacity: 0.5
         }
 
-        // ─── 2h. gear button ────────────────────────────────────
+        // ─── 2i. gear button ────────────────────────────────────
         Text {
             id: gearBtn
             anchors.right:  parent.right
@@ -372,16 +382,14 @@ Item {
             }
         }
 
-        // ─── 2i. colour settings panel ──────────────────────────
+        // ─── 2j. colour settings panel ──────────────────────────
         Rectangle {
             id: panel
-            anchors.right:  parent.right
-            anchors.bottom: gearBtn.top
-            anchors.margins: 4
-            width:  162
-            height: 152
-            radius: 6
-            color:  Qt.rgba(0.08, 0.08, 0.08, 0.85)
+            anchors.centerIn: parent
+            width:  parent.width  - 48
+            height: parent.height - 80  // leave room for version + gear
+            radius: 8
+            color:  Qt.rgba(0.08, 0.08, 0.08, 0.88)
             border {
                 width: 1
                 color: "#3a5a4e"
@@ -411,70 +419,83 @@ Item {
             }
 
             Column {
-                anchors.fill: parent
-                anchors.margins: 8
-                spacing: 4
+                anchors.centerIn: parent
+                width: parent.width * 0.85
+                spacing: 12
+
+                // title
+                Text {
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    text:   "调色盘"
+                    color:  "#8fb3a6"
+                    font {
+                        pixelSize: 22
+                        bold: true
+                    }
+                }
 
                 Repeater {
                     model: 5
                     delegate: Row {
                         id: layerRow
                         property int li: index
-                        spacing: 5
-                        height:  22
+                        spacing: 14
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        height: 46
 
                         // layer name
                         Text {
-                            width:  36
+                            width:  64
                             height: parent.height
                             text:   ["光晕","稀疏","环","配对","密集"][layerRow.li]
-                            color:  "#aaa"
-                            font.pixelSize: 10
+                            color:  "#ccc"
+                            font.pixelSize: 20
                             verticalAlignment: Text.AlignVCenter
                         }
 
                         // colour preview
                         Rectangle {
-                            width:  20
-                            height: 16
-                            radius: 2
+                            width:  36
+                            height: 36
+                            radius: 4
                             anchors.verticalCenter: parent.verticalCenter
                             border {
                                 width: 1
                                 color: "#555"
                             }
-                            color: getColor(layerRow.li)
+                            color: parseColor(getColor(layerRow.li))
                         }
 
                         // hex input
                         QQC2.TextField {
                             id: hexField
-                            width:  92
-                            height: 20
+                            width:  140
+                            height: 36
                             text:   getColor(layerRow.li)
                             font {
-                                pixelSize: 10
+                                pixelSize: 18
                                 family:    "monospace"
                             }
                             color: "#ccc"
                             background: Rectangle {
                                 color: "#2a2a2a"
-                                radius: 2
+                                radius: 3
                                 border {
                                     width: 1
                                     color: "#555"
                                 }
                             }
                             verticalAlignment: TextInput.AlignVCenter
-                            leftPadding:  6
-                            rightPadding: 4
+                            horizontalAlignment: TextInput.AlignHCenter
+                            leftPadding:  8
+                            rightPadding: 8
                             validator: RegExpValidator {
-                                regExp: /^#[0-9a-fA-F]{6}$/
+                                regExp: /^#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?$/
                             }
 
                             onEditingFinished: {
                                 var t = text.trim();
-                                if (t.match(/^#[0-9a-fA-F]{6}$/))
+                                if (t.match(/^#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?$/))
                                     setColor(layerRow.li, t);
                             }
                             Keys.onReturnPressed:  focus = false
@@ -483,10 +504,9 @@ Item {
                     }
                 }
             }
-
         }
 
-        // ─── 2j. animation timer ────────────────────────────────
+        // ─── 2k. animation timer ────────────────────────────────
         Timer {
             id: ft
             interval: 16
@@ -505,7 +525,7 @@ Item {
             }
         }
 
-        // ─── 2k. lifecycle ──────────────────────────────────────
+        // ─── 2l. lifecycle ──────────────────────────────────────
         Component.onCompleted: {
             syncColors();
             initState();
