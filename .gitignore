@@ -1,0 +1,12 @@
+# internal tool state
+.fp/
+
+# build artifacts
+*.plasmoid
+
+# web pages accidentally saved
+*.html
+
+# OS junk
+.DS_Store
+Thumbs.db
