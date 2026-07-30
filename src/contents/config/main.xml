@@ -25,5 +25,33 @@
       <label>光环 4 — 密集齿</label>
       <default>#c4e0d8</default>
     </entry>
+
+    <!-- dual-color entries for data-driven layers -->
+    <entry name="color1Start" type="String">
+      <label>光环 1 (CPU) 低负载色</label>
+      <default>#2a6e7e</default>
+    </entry>
+    <entry name="color1End" type="String">
+      <label>光环 1 (CPU) 高负载色</label>
+      <default>#c04040</default>
+    </entry>
+
+    <entry name="color2Start" type="String">
+      <label>光环 2 (内存) 低使用率色</label>
+      <default>#3a9a6a</default>
+    </entry>
+    <entry name="color2End" type="String">
+      <label>光环 2 (内存) 高使用率色</label>
+      <default>#b058d0</default>
+    </entry>
+
+    <entry name="color4Start" type="String">
+      <label>光环 4 (网络) 低速色</label>
+      <default>#4a8a7a</default>
+    </entry>
+    <entry name="color4End" type="String">
+      <label>光环 4 (网络) 高速色</label>
+      <default>#d0a050</default>
+    </entry>
   </group>
 </kcfg>

@@ -1,10 +1,10 @@
 {
   "tasks": [
     {
-      "id": 1,
-      "subject": "为 HALO 动画创建 KDE Plasma 5 桌面小部件",
-      "status": "completed"
+      "id": 5,
+      "subject": "三环 embodiment：颜色双端 + 三维度映射",
+      "status": "in_progress"
     }
   ],
-  "next_id": 2
+  "next_id": 7
 }
