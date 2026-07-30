@@ -110,17 +110,16 @@ Item {
         property real sysDiskWrite: 0   // sectors/s
         property var  _diskPrev: ({ r: 0, w: 0 })
         property var  _diskTime: 0
-        // GPU
-        property real sysGpu:   0       // 0..100
-        property real sysGpuTemp: 40    // celsius
+        // GPU (显存占用百分比 + 温度, 来自 nvidia-smi)
+        property real sysGpu:   0       // 0..100 VRAM%
+        property real sysGpuTemp: 50    // celsius
 
-        // Disk (layer 0)
-        property real diskOpacity: 0    // 0‑1  I/O activity → alpha
-        property real diskColorMix: 0   // 0‑1  write/total ratio → colour
-        // GPU (layer 3)
-        property real gpuColorMix: 0    // 0‑1  temp → colour
-        property real gpuPulse: 1       // 0.5‑3  usage → pulse amplitude
-        property real gpuRotSpd:1       // 0.3‑3  usage → rotation speed
+        // Disk (layer 0) — color by total throughput
+        property real diskColorMix: 0   // 0‑1  total I/O → colour mix
+        // GPU (layer 3) — VRAM%
+        property real gpuColorMix: 0    // 0‑1  vram% → colour
+        property real gpuPulse: 1       // 0.5‑3  vram% → pulse amplitude
+        property real gpuRotSpd:1       // 0.3‑3  vram% → rotation speed
 
         // ─── 2c. color config (persistent) ──────────────────────
         // color config (continued) ──────────────────────────────
@@ -192,18 +191,16 @@ Item {
             memMix    = Math.max(0, Math.min(1, sysMem / 100));
             memBright = 0.3 + memMix * 1.2;
 
-            // Disk layer (0) — color by R/W ratio, opacity by total I/O
+            // Disk layer (0) — color by total throughput (low→start, high→end)
             var totalRate = sysDiskRead + sysDiskWrite;
-            var refIO = 50000;  // ~25 MB/s reference
-            diskOpacity = Math.min(1, totalRate / refIO);
-            diskColorMix = totalRate > 0
-                ? Math.min(1, sysDiskWrite / totalRate)
-                : diskColorMix;  // hold last value when idle
+            var refIO = 50000;  // ~25 MB/s reference
+            diskColorMix = Math.min(1, totalRate / refIO);
 
-            // GPU layer (3)
-            gpuColorMix = Math.max(0, Math.min(1, (sysGpuTemp - 35) / 50));
-            gpuPulse  = 0.5 + Math.min(1, sysGpu / 100) * 2.5;
-            gpuRotSpd = 0.3 + Math.min(1, sysGpu / 100) * 2.7;
+            // GPU layer (3) — VRAM% → colour & pulse, temp → rotation speed
+            gpuColorMix = Math.max(0, Math.min(1, sysGpu / 100));
+            gpuPulse  = 0.5 + gpuColorMix * 2.5;
+            var gpuTempNorm = Math.max(0, Math.min(1, (sysGpuTemp - 35) / 55));
+            gpuRotSpd = 0.3 + gpuTempNorm * 2.7;
 
             // Network layer (4)
             var maxNet = 5 * 1024 * 1024;  // 5 MB/s reference
@@ -318,7 +315,7 @@ Item {
                 ch.st = now;
                 ch.d  = ch.td * (0.6 + Math.random() * 0.8);
                 // modulate pulse speed by system data (higher factor = faster = more agitated)
-                if (li === 0) ch.d /= Math.max(0.3, w.diskOpacity * 1.5 + 0.2);
+                if (li === 0) ch.d /= Math.max(0.3, w.diskColorMix * 1.5 + 0.2);
                 if (li === 1) ch.d /= Math.max(0.3, w.cpuPulse);
                 if (li === 3) ch.d /= Math.max(0.3, w.gpuPulse);
                 if (li === 4) ch.d /= Math.max(0.3, w.netPulse);
@@ -448,11 +445,15 @@ Item {
                         w._diskPrev = { r: r, w: w_ };
                         w._diskTime = now;
                     }
-                } else if (src.indexOf("#GPU") >= 0) {
-                    w.sysGpu = Math.min(100, Math.max(0, parseFloat(out) || 0));
-                } else if (src.indexOf("#GPUTEMP") >= 0) {
-                    var t = parseInt(out) / 1000;
-                    w.sysGpuTemp = isNaN(t) ? 40 : Math.max(20, Math.min(100, t));
+                } else if (src.indexOf("#GPUV") >= 0) {
+                    // nvidia-smi: "used, total, temp"
+                    var parts = out.split(',');
+                    if (parts.length >= 3) {
+                        var used = parseFloat(parts[0]) || 0;
+                        var total = parseFloat(parts[1]) || 1;
+                        w.sysGpu = Math.min(100, Math.max(0, used / total * 100));
+                        w.sysGpuTemp = parseFloat(parts[2]) || 50;
+                    }
                 }
                 // recompute modulation factors after any data update
                 w.computeModulation();
@@ -478,11 +479,9 @@ Item {
                 sysMon.connectSource(
                     "awk '/enp|wlp/{r+=$2;t+=$10} END{printf \"%d %d\", r, t}' /proc/net/dev #NET " + tok);
                 sysMon.connectSource(
-                    "awk '/sd[a-z] /{r+=$6;w+=$10} END{printf \"%d %d\", r, w}' /proc/diskstats #DISK " + tok);
+                    "awk '/sd[a-z] |nvme[0-9]n[0-9] /{r+=$6;w+=$10} END{printf \"%d %d\", r, w}' /proc/diskstats #DISK " + tok);
                 sysMon.connectSource(
-                    "cat /sys/class/drm/card0/device/gpu_busy_percent 2>/dev/null || echo 0 #GPU " + tok);
-                sysMon.connectSource(
-                    "cat /sys/class/drm/card0/device/hwmon/hwmon*/temp1_input 2>/dev/null || echo 40000 #GPUTEMP " + tok);
+                    "nvidia-smi --query-gpu=memory.used,memory.total,temperature.gpu --format=csv,noheader,nounits 2>/dev/null || echo '0,1,50' #GPUV " + tok);
             }
             onRunningChanged: { if (running) triggered(); }
         }
@@ -529,7 +528,6 @@ Item {
                     ctx.lineWidth   = sw;
                     var alpha = ev(flickerKfs[i],
                                    (el % layerConf[i].fMs) / layerConf[i].fMs);
-                    if (i === 0) alpha *= Math.min(1, Math.max(0.03, w.diskOpacity));
                     if (i === 2) alpha *= Math.min(1.5, Math.max(0.2, w.memBright));
                     ctx.globalAlpha = Math.min(1, Math.max(0, alpha));
 
@@ -593,7 +591,7 @@ Item {
                       : (nU/1e6).toFixed(1) + " MB/s";
                 return "CPU:" + w.sysCpu.toFixed(1) + "%  MEM:" + w.sysMem.toFixed(1)
                      + "%  LOAD:" + w.sysLoad.toFixed(2)
-                     + "\nT:" + w.sysTemp.toFixed(1) + "°C GPU:" + w.sysGpu.toFixed(0)
+                     + "\nT:" + w.sysTemp.toFixed(1) + "°C GPUv:" + w.sysGpu.toFixed(1)
                      + "%(" + w.sysGpuTemp.toFixed(0) + "°C)"
                      + "\n↓" + nDs + "  ↑" + nUs
                      + "  ▣R:" + w.sysDiskRead.toFixed(0) + " W:" + w.sysDiskWrite.toFixed(0);

@@ -5,17 +5,53 @@
                           http://www.kde.org/standards/kcfg/1.0/kcfg.xsd">
   <kcfgfile name=""/>
   <group name="General">
-    <entry name="color0" type="String">
-      <label>光环 0 — 光晕</label>
-      <default>#8fb3a6</default>
+    <!-- ════ 双端色层（所有层现在都是双端） ════ -->
+
+    <entry name="color0Start" type="String">
+      <label>光环 0 (磁盘) 空闲色</label>
+      <default>#5a8a7a</default>
     </entry>
-    <entry name="color1" type="String">
-      <label>光环 1 — 稀疏齿</label>
-      <default>#cfe7df</default>
+    <entry name="color0End" type="String">
+      <label>光环 0 (磁盘) 活跃色</label>
+      <default>#c0a050</default>
     </entry>
-    <entry name="color2" type="String">
-      <label>光环 2 — 环</label>
-      <default>#bfe0d6</default>
+
+    <entry name="color1Start" type="String">
+      <label>光环 1 (CPU) 低负载色</label>
+      <default>#2a6e7e</default>
+    </entry>
+    <entry name="color1End" type="String">
+      <label>光环 1 (CPU) 高负载色</label>
+      <default>#c04040</default>
+    </entry>
+
+    <entry name="color2Start" type="String">
+      <label>光环 2 (内存) 低使用率色</label>
+      <default>#3a9a6a</default>
+    </entry>
+    <entry name="color2End" type="String">
+      <label>光环 2 (内存) 高使用率色</label>
+      <default>#b058d0</default>
+    </entry>
+
+    <entry name="color3Start" type="String">
+      <label>光环 3 (GPU) 低温色</label>
+      <default>#6ab0c0</default>
+    </entry>
+    <entry name="color3End" type="String">
+      <label>光环 3 (GPU) 高温色</label>
+      <default>#d05030</default>
+    </entry>
+
+    <entry name="color4Start" type="String">
+      <label>光环 4 (网络) 低速色</label>
+      <default>#4a8a7a</default>
+    </entry>
+    <entry name="color4End" type="String">
+      <label>光环 4 (网络) 高速色</label>
+      <default>#d0a050</default>
+    </entry>
+  </group>
     </entry>
     <entry name="color3" type="String">
       <label>光环 3 — 配对齿</label>

@@ -1,4 +1,10 @@
 {
-  "tasks": [],
-  "next_id": 7
+  "tasks": [
+    {
+      "id": 7,
+      "subject": "Embodiment: 磁盘→层0, GPU→层3",
+      "status": "completed"
+    }
+  ],
+  "next_id": 8
 }
