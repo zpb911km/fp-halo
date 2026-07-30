@@ -1,71 +1,57 @@
+// ================================================================
+// HALO — 液压联动光环 | KDE Plasma 5 Widget
+// version v0.8
+// ================================================================
+
 import QtQuick 2.15
 import QtQuick.Controls 2.15 as QQC2
 import org.kde.plasma.core 2.0 as PlasmaCore
 import org.kde.plasma.plasmoid 2.0
 
+// ================================================================
+// 1. ROOT — Plasmoid shell
+// ================================================================
+
 Item {
     id: root
-    width: 400
+    width:  400
     height: 400
 
-    Plasmoid.backgroundHints: PlasmaCore.Types.NoBackground
+    Plasmoid.backgroundHints:        PlasmaCore.Types.NoBackground
     Plasmoid.preferredRepresentation: Plasmoid.fullRepresentation
+
+    // ============================================================
+    // 2. fullRepresentation — main widget surface
+    // ============================================================
+
     Plasmoid.fullRepresentation: Item {
-        id: widgetRoot
+        id: w
         anchors.fill: parent
 
-        readonly property real sf: Math.min(width, height) / 400
-        readonly property real gap: 3
-        readonly property real minThick: 1.5
-        readonly property real maxR: 195
-        readonly property string version: "v0.6"
+        // ─── 2a. layout constants ───────────────────────────────
+        readonly property real sf:        Math.min(width, height) / 400
+        readonly property real gap:       3
+        readonly property real minThick:  1.5
+        readonly property real maxR:      195
+        readonly property string version: "v0.8"
 
-        readonly property var layerNames: [
-            "光晕","稀疏","环","配对","密集"
-        ]
-
+        // ─── 2b. per-layer animation config ─────────────────────
         readonly property var layerConf: [
-            { dashAngles: [],              fMs: 3000,  rot: false, rotMs: 0 },
-            { dashAngles: [1.1, 18.9],     fMs: 5000,  rot: true,  rotMs: 23000 },
-            { dashAngles: [],              fMs: 7000,  rot: false, rotMs: 0 },
-            { dashAngles: [1, 2.6, 1, 19.4], fMs: 11000, rot: true, rotMs: 29000 },
-            { dashAngles: [0.65, 4.35],    fMs: 13000, rot: true, rotMs: 31000 },
+            //   dashAngles (deg)                 flashMs  rotate  rotMs
+            {  dashAngles: [],                        fMs: 3000,  rot: false, rotMs: 0 },
+            {  dashAngles: [1.1, 18.9],               fMs: 5000,  rot: true,  rotMs: 23000 },
+            {  dashAngles: [],                        fMs: 7000,  rot: false, rotMs: 0 },
+            {  dashAngles: [1, 2.6, 1, 19.4],         fMs: 11000, rot: true,  rotMs: 29000 },
+            {  dashAngles: [0.65, 4.35],              fMs: 13000, rot: true,  rotMs: 31000 },
         ]
-
-        readonly property var defaultColors: [
-            "#8fb3a6", "#cfe7df", "#bfe0d6", "#d6ece4", "#c4e0d8"
-        ]
-
-        property string _c0: defaultColors[0]
-        property string _c1: defaultColors[1]
-        property string _c2: defaultColors[2]
-        property string _c3: defaultColors[3]
-        property string _c4: defaultColors[4]
-
-        function syncColors() {
-            var v;
-            v = Plasmoid.configuration["color0"]; _c0 = (v && v.length > 0) ? v : defaultColors[0];
-            v = Plasmoid.configuration["color1"]; _c1 = (v && v.length > 0) ? v : defaultColors[1];
-            v = Plasmoid.configuration["color2"]; _c2 = (v && v.length > 0) ? v : defaultColors[2];
-            v = Plasmoid.configuration["color3"]; _c3 = (v && v.length > 0) ? v : defaultColors[3];
-            v = Plasmoid.configuration["color4"]; _c4 = (v && v.length > 0) ? v : defaultColors[4];
-        }
-
-        function setColor(i, hex) {
-            Plasmoid.configuration["color" + i] = hex;
-            if (i === 0) _c0 = hex;
-            else if (i === 1) _c1 = hex;
-            else if (i === 2) _c2 = hex;
-            else if (i === 3) _c3 = hex;
-            else if (i === 4) _c4 = hex;
-        }
 
         readonly property var layerPulse: [
-            { iInt: 2200, oInt: 3100, tDur: 600 },
-            { iInt: 2800, oInt: 3700, tDur: 500 },
-            { iInt: 3400, oInt: 4300, tDur: 450 },
-            { iInt: 4100, oInt: 5200, tDur: 550 },
-            { iInt: 4800, oInt: 6100, tDur: 500 },
+            //   innerInterval  outerInterval  transitionDur
+            {  iInt: 2200,  oInt: 3100,  tDur: 600 },
+            {  iInt: 2800,  oInt: 3700,  tDur: 500 },
+            {  iInt: 3400,  oInt: 4300,  tDur: 450 },
+            {  iInt: 4100,  oInt: 5200,  tDur: 550 },
+            {  iInt: 4800,  oInt: 6100,  tDur: 500 },
         ]
 
         readonly property var flickerKfs: [
@@ -82,49 +68,69 @@ Item {
 
         readonly property var rotKfs: [
             [],
-            [ [0,0],[0.10,0],[0.20,60],[0.30,60],[0.45,120],[0.60,120],[0.75,240],[0.90,240],[1,360] ],
+            [ [0,0],[0.10,0],[0.20,60],[0.30,60],
+
+              [0.45,120],[0.60,120],[0.75,240],[0.90,240],[1,360] ],
             [],
-            [ [0,0],[0.15,0],[0.25,-90],[0.40,-90],[0.55,-180],[0.70,-180],[0.85,-270],[0.95,-270],[1,-360] ],
-            [ [0,0],[0.05,0],[0.15,45],[0.25,45],[0.35,90],[0.50,90],[0.65,180],[0.80,180],[0.90,270],[0.95,270],[1,360] ],
+            [ [0,0],[0.15,0],[0.25,-90],[0.40,-90],
+              [0.55,-180],[0.70,-180],[0.85,-270],[0.95,-270],[1,-360] ],
+            [ [0,0],[0.05,0],[0.15,45],[0.25,45],[0.35,90],[0.50,90],
+              [0.65,180],[0.80,180],[0.90,270],[0.95,270],[1,360] ],
         ]
 
         readonly property var initBounds: [
-            {i:20,o:80},{i:115,o:125},{i:136,o:138},{i:150,o:162},{i:175,o:185}
+            { i:20,  o:80  },
+            { i:115, o:125 },
+            { i:136, o:138 },
+            { i:150, o:162 },
+            { i:175, o:185 },
         ]
 
-        property var st: []
-        property var t0: 0
-        property bool stReady: false
+        // ─── 2c. color config (persistent) ──────────────────────
+        readonly property var defaultColors: [
+            "#8fb3a6", "#cfe7df", "#bfe0d6", "#d6ece4", "#c4e0d8"
+        ]
 
-        function initState() {
-            var n = Date.now();
-            t0 = n;
-            var s = [];
-            for (var i = 0; i < 5; i++) {
-                var p = layerPulse[i];
-                s.push({
-                    ii: {
-                        c: initBounds[i].i, t: initBounds[i].i, f: initBounds[i].i,
-                        st: 0, d: 600,
-                        np: n + Math.random() * p.iInt,
-                        iv: p.iInt, td: p.tDur
-                    },
-                    oo: {
-                        c: initBounds[i].o, t: initBounds[i].o, f: initBounds[i].o,
-                        st: 0, d: 600,
-                        np: n + Math.random() * p.oInt,
-                        iv: p.oInt, td: p.tDur
-                    },
-                });
-            }
-            st = s;
-            stReady = true;
+        property string _c0: defaultColors[0]
+        property string _c1: defaultColors[1]
+        property string _c2: defaultColors[2]
+        property string _c3: defaultColors[3]
+        property string _c4: defaultColors[4]
+
+        function getColor(i) {
+            return i === 0 ? _c0 : i === 1 ? _c1 : i === 2 ? _c2 : i === 3 ? _c3 : _c4;
         }
 
+        function syncColors() {
+            var v;
+            v = Plasmoid.configuration.color0; _c0 = (v && v.length) ? v : defaultColors[0];
+            v = Plasmoid.configuration.color1; _c1 = (v && v.length) ? v : defaultColors[1];
+            v = Plasmoid.configuration.color2; _c2 = (v && v.length) ? v : defaultColors[2];
+            v = Plasmoid.configuration.color3; _c3 = (v && v.length) ? v : defaultColors[3];
+            v = Plasmoid.configuration.color4; _c4 = (v && v.length) ? v : defaultColors[4];
+        }
+
+        function setColor(i, hex) {
+            Plasmoid.configuration["color" + i] = hex;
+            if      (i === 0) _c0 = hex;
+            else if (i === 1) _c1 = hex;
+            else if (i === 2) _c2 = hex;
+            else if (i === 3) _c3 = hex;
+            else if (i === 4) _c4 = hex;
+        }
+
+        // ─── 2d. animation state ────────────────────────────────
+        property var  st:       []
+        property var  t0:       0
+        property bool stReady:  false
+
+        // ─── 2e. animation math functions ───────────────────────
+
+        /* cubic‑bezier solver (0,0)–(0.4,0.2)–(1,1) */
         function cb(t) {
             var bx = 0.4, by = 0.2, g = t;
             for (var i = 0; i < 8; i++) {
-                var x = 3*bx*g*(1-g)*(1-g) + 3*by*g*g*(1-g) + g*g*g - t;
+                var x  = 3*bx*g*(1-g)*(1-g) + 3*by*g*g*(1-g) + g*g*g - t;
                 var dx = 3*bx*(1-g)*(1-g) - 6*bx*g*(1-g) + 3*by*g*(2-3*g) + 3*g*g;
                 if (Math.abs(x) < 1e-6) break;
                 g -= x / dx; g = Math.max(0, Math.min(1, g));
@@ -132,6 +138,7 @@ Item {
             return 3*0*g*(1-g)*(1-g) + 3*1*g*g*(1-g) + g*g*g;
         }
 
+        /* linear eval of keyframe table */
         function ev(k, p) {
             if (p <= k[0][0]) return k[0][1];
             if (p >= k[k.length-1][0]) return k[k.length-1][1];
@@ -144,6 +151,7 @@ Item {
             return k[0][1];
         }
 
+        /* bezier‑eased eval of rotation keyframes */
         function evr(k, p) {
             if (p <= k[0][0]) return k[0][1];
             if (p >= k[k.length-1][0]) return k[k.length-1][1];
@@ -156,26 +164,34 @@ Item {
             return k[0][1];
         }
 
+        /* ease‑out cubic */
         function eoc(t) { return 1 - Math.pow(1 - t, 3); }
+
+        /* next pulse time with jitter */
         function npt(a) { return a * (0.3 + Math.random() * 2.2); }
 
+        /* update a single channel (inner/outer) */
         function uc(ch, now, li, ct) {
             if (now >= ch.np) {
                 ch.f = ch.c;
                 var b = [];
-                for (var bi = 0; bi < st.length; bi++) b.push({i:st[bi].ii.c, o:st[bi].oo.c});
+                for (var bi = 0; bi < st.length; bi++)
+                    b.push({ i: st[bi].ii.c, o: st[bi].oo.c });
+
                 var mn, mx;
                 if (ct === 'i') {
                     mn = (li === 0) ? 0 : b[li-1].o + gap;
-                    mx = Math.min(b[li].o - minThick, (li === 4) ? maxR - minThick : b[li+1].i - gap - minThick);
+                    mx = Math.min(b[li].o - minThick,
+                                  (li === 4) ? maxR - minThick
+                                             : b[li+1].i - gap - minThick);
                 } else {
                     mn = b[li].i + minThick;
                     mx = (li === 4) ? maxR : b[li+1].i - gap;
                 }
                 if (mn > mx) { ch.np = now + npt(ch.iv); return; }
-                ch.t = mn + Math.random() * (mx - mn);
+                ch.t  = mn + Math.random() * (mx - mn);
                 ch.st = now;
-                ch.d = ch.td * (0.6 + Math.random() * 0.8);
+                ch.d  = ch.td * (0.6 + Math.random() * 0.8);
                 ch.np = now + ch.d + npt(ch.iv);
             }
             if (now < ch.st + ch.d) {
@@ -186,33 +202,72 @@ Item {
             }
         }
 
+        /* enforce boundary constraints (iterative) */
         function enf() {
             for (var it = 0; it < 3; it++) {
                 for (var i = 0; i < st.length; i++) {
-                    if (i === 0) st[i].ii.c = Math.max(0, st[i].ii.c);
-                    else st[i].ii.c = Math.max(st[i-1].oo.c + gap, st[i].ii.c);
-                    if (i === st.length-1) st[i].oo.c = Math.min(maxR, st[i].oo.c);
-                    else st[i].oo.c = Math.min(st[i+1].ii.c - gap, st[i].oo.c);
+                    if (i === 0)
+                        st[i].ii.c = Math.max(0, st[i].ii.c);
+                    else
+                        st[i].ii.c = Math.max(st[i-1].oo.c + gap, st[i].ii.c);
+
+                    if (i === st.length-1)
+                        st[i].oo.c = Math.min(maxR, st[i].oo.c);
+                    else
+                        st[i].oo.c = Math.min(st[i+1].ii.c - gap, st[i].oo.c);
+
                     if (st[i].oo.c < st[i].ii.c + minThick) {
-                        if (i === st.length-1 || st[i].oo.c + minThick <= st[i+1].ii.c - gap)
+                        if (i === st.length-1 ||
+                            st[i].oo.c + minThick <= st[i+1].ii.c - gap)
                             st[i].oo.c = st[i].ii.c + minThick;
-                        else st[i].ii.c = st[i].oo.c - minThick;
+                        else
+                            st[i].ii.c = st[i].oo.c - minThick;
                     }
                 }
             }
         }
 
+        /* initialise all channels */
+        function initState() {
+            var n = Date.now();
+            t0 = n;
+            var s = [];
+            for (var i = 0; i < 5; i++) {
+                var p = layerPulse[i];
+                s.push({
+                    ii: {
+                        c:  initBounds[i].i, t: initBounds[i].i, f: initBounds[i].i,
+                        st: 0, d: 600,
+                        np: n + Math.random() * p.iInt,
+                        iv: p.iInt, td: p.tDur
+                    },
+                    oo: {
+                        c:  initBounds[i].o, t: initBounds[i].o, f: initBounds[i].o,
+                        st: 0, d: 600,
+                        np: n + Math.random() * p.oInt,
+                        iv: p.oInt, td: p.tDur
+                    },
+                });
+            }
+            st = s;
+            stReady = true;
+        }
+
+        /* manual arc drawer (bypass Qt arc() undersampling for small arcs) */
         function arcAt(ctx, cx, cy, r, sa, ea) {
             var span = ea - sa;
             var n = Math.max(4, Math.round(span * r * 0.5));
             var stp = span / n;
             for (var j = 0; j <= n; j++) {
                 var a = sa + j * stp;
-                if (j === 0) ctx.moveTo(cx + r * Math.cos(a), cy + r * Math.sin(a));
-                else ctx.lineTo(cx + r * Math.cos(a), cy + r * Math.sin(a));
+                if (j === 0)
+                    ctx.moveTo(cx + r * Math.cos(a), cy + r * Math.sin(a));
+                else
+                    ctx.lineTo(cx + r * Math.cos(a), cy + r * Math.sin(a));
             }
         }
 
+        // ─── 2f. Canvas renderer ────────────────────────────────
         Canvas {
             id: cv
             anchors.fill: parent
@@ -222,27 +277,36 @@ Item {
                 var ctx = getContext("2d");
                 ctx.clearRect(0, 0, width, height);
                 if (!stReady || st.length === 0) return;
-                var el = Date.now() - t0;
-                var s = sf;
-                var cx = width / 2, cy = height / 2;
+
+                var el   = Date.now() - t0;
+                var s    = w.sf;
+                var cx   = width  / 2;
+                var cy   = height / 2;
 
                 for (var i = 0; i < 5; i++) {
                     var ci = st[i].ii.c * s;
                     var co = st[i].oo.c * s;
-                    var r = (ci + co) / 2;
+                    var r  = (ci + co) / 2;
                     var sw = Math.max(co - ci, 0.1);
 
                     ctx.save();
 
+                    // rotation transform
                     if (layerConf[i].rot) {
-                        var a = evr(rotKfs[i], (el % layerConf[i].rotMs) / layerConf[i].rotMs);
-                        ctx.translate(cx, cy); ctx.rotate(a * Math.PI / 180); ctx.translate(-cx, -cy);
+                        var a = evr(rotKfs[i],
+                                    (el % layerConf[i].rotMs) / layerConf[i].rotMs);
+                        ctx.translate(cx, cy);
+                        ctx.rotate(a * Math.PI / 180);
+                        ctx.translate(-cx, -cy);
                     }
 
-                    ctx.strokeStyle = i === 0 ? _c0 : i === 1 ? _c1 : i === 2 ? _c2 : i === 3 ? _c3 : _c4;
-                    ctx.lineWidth = sw;
-                    ctx.globalAlpha = ev(flickerKfs[i], (el % layerConf[i].fMs) / layerConf[i].fMs);
+                    // colour & opacity
+                    ctx.strokeStyle = getColor(i);
+                    ctx.lineWidth   = sw;
+                    ctx.globalAlpha = ev(flickerKfs[i],
+                                         (el % layerConf[i].fMs) / layerConf[i].fMs);
 
+                    // draw
                     var da = layerConf[i].dashAngles;
                     if (da.length > 0) {
                         var cycleTotal = 0;
@@ -270,55 +334,62 @@ Item {
             }
         }
 
-        // ─── 版本标签 ───
+        // ─── 2g. version badge ──────────────────────────────────
         Text {
-            anchors.left: parent.left
-            anchors.top: parent.top
+            anchors.left:   parent.left
+            anchors.top:    parent.top
             anchors.margins: 4
-            text: version
-            color: "#5a7a6e"
-            font.pixelSize: 10
-            font.family: "monospace"
+            text:   version
+            color:  "#5a7a6e"
+            font {
+                pixelSize: 10
+                family:    "monospace"
+            }
             opacity: 0.5
         }
 
-        // ─── 齿轮按钮 ───
+        // ─── 2h. gear button ────────────────────────────────────
         Text {
             id: gearBtn
-            anchors.right: parent.right
+            anchors.right:  parent.right
             anchors.bottom: parent.bottom
             anchors.margins: 6
-            text: "⚙"
+            text:   "⚙"
             font.pixelSize: 14
-            color: settingsPanel.opened ? "#8fb3a6" : "#4a6a5e"
+            color:  panel.opened ? "#8fb3a6" : "#4a6a5e"
             opacity: 0.7
-            Behavior on color { ColorAnimation { duration: 150 } }
+
+            Behavior on color {
+                ColorAnimation { duration: 150 }
+            }
 
             MouseArea {
                 anchors.fill: parent
                 hoverEnabled: true
-                onClicked: settingsPanel.toggle()
-                onEntered: parent.color = "#8fb3a6"
-                onExited: parent.color = settingsPanel.opened ? "#8fb3a6" : "#4a6a5e"
+                onClicked:  panel.toggle()
+                onEntered:  parent.color = "#8fb3a6"
+                onExited:   parent.color = panel.opened ? "#8fb3a6" : "#4a6a5e"
             }
         }
 
-        // ─── 设置面板 ───
+        // ─── 2i. colour settings panel ──────────────────────────
         Rectangle {
-            id: settingsPanel
-            anchors.right: parent.right
+            id: panel
+            anchors.right:  parent.right
             anchors.bottom: gearBtn.top
             anchors.margins: 4
-            width: 162
+            width:  162
             height: 152
             radius: 6
-            color: Qt.rgba(0.08, 0.08, 0.08, 0.85)
-            border.width: 1
-            border.color: "#3a5a4e"
+            color:  Qt.rgba(0.08, 0.08, 0.08, 0.85)
+            border {
+                width: 1
+                color: "#3a5a4e"
+            }
+
             visible: false
             opacity: 0
             Behavior on opacity { NumberAnimation { duration: 200 } }
-
 
             property bool opened: false
 
@@ -328,7 +399,11 @@ Item {
                 opacity = opened ? 1 : 0;
                 if (opened) forceActiveFocus();
             }
-            Keys.onEscapePressed: { opened = false; opacity = 0; }
+
+            Keys.onEscapePressed: {
+                opened = false;
+                opacity = 0;
+            }
 
             MouseArea {
                 anchors.fill: parent
@@ -346,66 +421,77 @@ Item {
                         id: layerRow
                         property int li: index
                         spacing: 5
-                        height: 22
+                        height:  22
 
+                        // layer name
                         Text {
-                            width: 36
+                            width:  36
                             height: parent.height
-                            text: ["光晕","稀疏","环","配对","密集"][layerRow.li]
-                            color: "#aaa"
+                            text:   ["光晕","稀疏","环","配对","密集"][layerRow.li]
+                            color:  "#aaa"
                             font.pixelSize: 10
                             verticalAlignment: Text.AlignVCenter
                         }
 
-                        // ─── 当前颜色预览 ───
+                        // colour preview
                         Rectangle {
-                            width: 20; height: 16
+                            width:  20
+                            height: 16
                             radius: 2
                             anchors.verticalCenter: parent.verticalCenter
-                            border.width: 1
-                            border.color: "#555"
-                            color: (layerRow.li === 0 ? _c0 : layerRow.li === 1 ? _c1 : layerRow.li === 2 ? _c2 : layerRow.li === 3 ? _c3 : _c4)
+                            border {
+                                width: 1
+                                color: "#555"
+                            }
+                            color: getColor(layerRow.li)
                         }
 
-                        // ─── hex 输入框 ───
+                        // hex input
                         QQC2.TextField {
-                            width: 92
+                            id: hexField
+                            width:  92
                             height: 20
-                            text: (layerRow.li === 0 ? _c0 : layerRow.li === 1 ? _c1 : layerRow.li === 2 ? _c2 : layerRow.li === 3 ? _c3 : _c4)
-                            font.pixelSize: 10
-                            font.family: "monospace"
+                            text:   getColor(layerRow.li)
+                            font {
+                                pixelSize: 10
+                                family:    "monospace"
+                            }
                             color: "#ccc"
                             background: Rectangle {
                                 color: "#2a2a2a"
                                 radius: 2
-                                border.width: 1
-                                border.color: "#555"
+                                border {
+                                    width: 1
+                                    color: "#555"
+                                }
                             }
                             verticalAlignment: TextInput.AlignVCenter
-                            leftPadding: 6
+                            leftPadding:  6
                             rightPadding: 4
-                            validator: RegExpValidator { regExp: /^#[0-9a-fA-F]{6}$/ }
+                            validator: RegExpValidator {
+                                regExp: /^#[0-9a-fA-F]{6}$/
+                            }
 
                             onEditingFinished: {
                                 var t = text.trim();
-                                if (t.match(/^#[0-9a-fA-F]{6}$/)) {
+                                if (t.match(/^#[0-9a-fA-F]{6}$/))
                                     setColor(layerRow.li, t);
-                                }
                             }
-                            Keys.onReturnPressed: focus = false
-                            Keys.onEnterPressed: focus = false
+                            Keys.onReturnPressed:  focus = false
+                            Keys.onEnterPressed:   focus = false
                         }
                     }
                 }
             }
+
         }
 
-        // ─── 帧定时器 ───
+        // ─── 2j. animation timer ────────────────────────────────
         Timer {
             id: ft
             interval: 16
-            repeat: true
-            running: true
+            repeat:   true
+            running:  true
 
             onTriggered: {
                 if (!stReady || st.length === 0) return;
@@ -419,7 +505,7 @@ Item {
             }
         }
 
-        // ─── 首次初始化 ───
+        // ─── 2k. lifecycle ──────────────────────────────────────
         Component.onCompleted: {
             syncColors();
             initState();
@@ -427,7 +513,8 @@ Item {
         }
 
         onVisibleChanged: {
-            if (visible && stReady) cv.requestPaint();
+            if (visible && stReady)
+                cv.requestPaint();
         }
     }
 }

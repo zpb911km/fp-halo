@@ -4,7 +4,7 @@
         "Name": "HALO",
         "Description": "Hydraulic coupled halo animation",
         "Category": "Miscellaneous",
-        "Version": "1.0",
+        "Version": "0.8",
         "License": "GPL-2.0+",
         "ServiceTypes": ["Plasma/Applet"],
         "Icon": "applications-graphics",
