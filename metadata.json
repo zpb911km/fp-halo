@@ -1,0 +1,15 @@
+{
+    "KPlugin": {
+        "Id": "org.zpb.halo",
+        "Name": "HALO",
+        "Description": "系统数据光环 — 五层光环映射磁盘/CPU/内存/GPU/网络",
+        "Category": "Miscellaneous",
+        "Version": "0.10",
+        "License": "GPL-2.0+",
+        "ServiceTypes": ["Plasma/Applet"],
+        "Icon": "applications-graphics",
+        "Website": "https://github.com/zpb911km/fp-halo"
+    },
+    "X-Plasma-API": "declarativeappletscript",
+    "X-Plasma-MainScript": "ui/main.qml"
+}

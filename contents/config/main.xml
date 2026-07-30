@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kcfg xmlns="http://www.kde.org/standards/kcfg/1.0"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:schemaLocation="http://www.kde.org/standards/kcfg/1.0
+                          http://www.kde.org/standards/kcfg/1.0/kcfg.xsd">
+  <kcfgfile name=""/>
+  <group name="General">
+    <!-- 各层双端色：起始色(低负载/空闲) → 终止色(高负载/繁忙) -->
+
+    <entry name="color0Start" type="String">
+      <label>层0 光晕 (磁盘) 空闲色</label>
+      <default>#5a8a7a</default>
+    </entry>
+    <entry name="color0End" type="String">
+      <label>层0 光晕 (磁盘) 活跃色</label>
+      <default>#c0a050</default>
+    </entry>
+
+    <entry name="color1Start" type="String">
+      <label>层1 稀疏齿 (CPU) 低负载色</label>
+      <default>#2a6e7e</default>
+    </entry>
+    <entry name="color1End" type="String">
+      <label>层1 稀疏齿 (CPU) 高负载色</label>
+      <default>#c04040</default>
+    </entry>
+
+    <entry name="color2Start" type="String">
+      <label>层2 环 (内存) 低使用率色</label>
+      <default>#3a9a6a</default>
+    </entry>
+    <entry name="color2End" type="String">
+      <label>层2 环 (内存) 高使用率色</label>
+      <default>#b058d0</default>
+    </entry>
+
+    <entry name="color3Start" type="String">
+      <label>层3 配对齿 (GPU) 低显存色</label>
+      <default>#6ab0c0</default>
+    </entry>
+    <entry name="color3End" type="String">
+      <label>层3 配对齿 (GPU) 高显存色</label>
+      <default>#d05030</default>
+    </entry>
+
+    <entry name="color4Start" type="String">
+      <label>层4 密集齿 (网络) 低速色</label>
+      <default>#4a8a7a</default>
+    </entry>
+    <entry name="color4End" type="String">
+      <label>层4 密集齿 (网络) 高速色</label>
+      <default>#d0a050</default>
+    </entry>
+  </group>
+</kcfg>
