@@ -1,0 +1,15 @@
+{
+    "KPlugin": {
+        "Id": "org.zpb.halo",
+        "Name": "HALO",
+        "Description": "Hydraulic coupled halo animation",
+        "Category": "Miscellaneous",
+        "Version": "1.0",
+        "License": "GPL-2.0+",
+        "ServiceTypes": ["Plasma/Applet"],
+        "Icon": "applications-graphics",
+        "Website": ""
+    },
+    "X-Plasma-API": "declarativeappletscript",
+    "X-Plasma-MainScript": "ui/main.qml"
+}

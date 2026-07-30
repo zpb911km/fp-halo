@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kcfg xmlns="http://www.kde.org/standards/kcfg/1.0"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:schemaLocation="http://www.kde.org/standards/kcfg/1.0
+                          http://www.kde.org/standards/kcfg/1.0/kcfg.xsd">
+  <kcfgfile name=""/>
+  <group name="General">
+    <entry name="color0" type="String">
+      <label>光环 0 — 光晕</label>
+      <default>#8fb3a6</default>
+    </entry>
+    <entry name="color1" type="String">
+      <label>光环 1 — 稀疏齿</label>
+      <default>#cfe7df</default>
+    </entry>
+    <entry name="color2" type="String">
+      <label>光环 2 — 环</label>
+      <default>#bfe0d6</default>
+    </entry>
+    <entry name="color3" type="String">
+      <label>光环 3 — 配对齿</label>
+      <default>#d6ece4</default>
+    </entry>
+    <entry name="color4" type="String">
+      <label>光环 4 — 密集齿</label>
+      <default>#c4e0d8</default>
+    </entry>
+  </group>
+</kcfg>
