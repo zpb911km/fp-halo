@@ -1,10 +1,4 @@
 {
-  "tasks": [
-    {
-      "id": 5,
-      "subject": "三环 embodiment：颜色双端 + 三维度映射",
-      "status": "in_progress"
-    }
-  ],
+  "tasks": [],
   "next_id": 7
 }

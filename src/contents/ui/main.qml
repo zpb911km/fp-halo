@@ -1,6 +1,6 @@
 // ================================================================
 // HALO — 液压联动光环 | KDE Plasma 5 Widget
-// version v0.9
+// version v0.10
 // ================================================================
 
 import QtQuick 2.15
@@ -33,7 +33,7 @@ Item {
         readonly property real gap:       3
         readonly property real minThick:  1.5
         readonly property real maxR:      195
-        readonly property string version: "v0.9"
+        readonly property string version: "v0.10"
 
         // ─── 2b. per-layer animation config ─────────────────────
         readonly property var layerConf: [
@@ -94,8 +94,9 @@ Item {
         property real sysNetUp:  0     // bytes/s (delta)
         property var  _netPrev: ({ d: 0, u: 0 })
         property var  _netTime: 0
-
         // modulation factors (computed from system data at each poll)
+        // modulation factors (computed from system data at each poll)
+        property int   paintTick: 0   // incremented after every data poll → forces Canvas+Text refresh
         property real cpuMix:   0     // 0‑1  CPU% → colour mix
         property real cpuPulse: 1     // 0.5‑3  temp → pulse amplitude
         property real cpuRotSpd:1     // 0.3‑3  loadavg → rotation speed
@@ -182,6 +183,10 @@ Item {
             netPulse  = 0.5 + Math.min(1, sysNetUp / maxNet) * 2.5;
             var total = (sysNetDown + sysNetUp) / (maxNet * 2);
             netRotSpd = 0.5 + Math.min(1, total) * 2.5;
+
+            // force UI refresh
+            paintTick++;
+            if (cv) cv.requestPaint();
         }
 
         // ─── 2d. animation state ────────────────────────────────
@@ -373,7 +378,7 @@ Item {
                 var src = sourceName;
 
                 if (src.indexOf("#CPU") >= 0) {
-                    w.sysCpu = parseFloat(out) || 0;
+                    w.sysCpu = Math.min(100, parseFloat(out) || 0);
                 } else if (src.indexOf("#MEM") >= 0) {
                     w.sysMem = (parseFloat(out) || 0) * 100;
                 } else if (src.indexOf("#LOAD") >= 0) {
@@ -412,7 +417,7 @@ Item {
             onTriggered: {
                 var tok = "#R" + Math.random().toString(36).substr(2, 6);
                 sysMon.connectSource(
-                    "awk '/^cpu /{printf \"%.2f\", ($2+$3+$4)*100/($2+$3+$4+$5)}' /proc/stat #CPU " + tok);
+                    "ps -eo %cpu --no-headers 2>/dev/null | awk -v n=\"$(nproc)\" '{s+=$1} END{printf \"%.1f\", s/n}' #CPU " + tok);
                 sysMon.connectSource(
                     "awk '/MemTotal/{t=$2} /MemAvailable/{a=$2} END{printf \"%.4f\", (t-a)/t}' /proc/meminfo #MEM " + tok);
                 sysMon.connectSource(
@@ -518,6 +523,8 @@ Item {
             anchors.top:    parent.top
             anchors.margins: 6
             text: {
+                // depend on paintTick to force re-evaluation after each poll
+                var _ = w.paintTick;
                 var nD = w.sysNetDown, nU = w.sysNetUp;
                 var nDs = nD < 1000 ? nD.toFixed(0) + " B/s"
                       : nD < 1e6 ? (nD/1000).toFixed(1) + " KB/s"
