@@ -398,6 +398,7 @@ Item {
         PlasmaCore.DataSource {
             id: sysMon
             engine: "executable"
+            interval: 2000
             connectedSources: []
 
             onNewData: {
@@ -460,30 +461,18 @@ Item {
             }
         }
 
-        // ─── 2g2. data poll timer ──────────────────────────────
-        Timer {
-            id: pollTimer
-            interval: 2000
-            running: true
-            repeat: true
-            onTriggered: {
-                var tok = "#R" + Math.random().toString(36).substr(2, 6);
-                sysMon.connectSource(
-                    "ps -eo %cpu --no-headers 2>/dev/null | awk -v n=\"$(nproc)\" '{s+=$1} END{printf \"%.1f\", s/n}' #CPU " + tok);
-                sysMon.connectSource(
-                    "awk '/MemTotal/{t=$2} /MemAvailable/{a=$2} END{printf \"%.4f\", (t-a)/t}' /proc/meminfo #MEM " + tok);
-                sysMon.connectSource(
-                    "awk '{print $1}' /proc/loadavg #LOAD " + tok);
-                sysMon.connectSource(
-                    "cat /sys/class/thermal/thermal_zone0/temp 2>/dev/null || echo 0 #TEMP " + tok);
-                sysMon.connectSource(
-                    "awk '/enp|wlp/{r+=$2;t+=$10} END{printf \"%d %d\", r, t}' /proc/net/dev #NET " + tok);
-                sysMon.connectSource(
-                    "awk '/sd[a-z] |nvme[0-9]n[0-9] /{r+=$6;w+=$10} END{printf \"%d %d\", r, w}' /proc/diskstats #DISK " + tok);
-                sysMon.connectSource(
-                    "nvidia-smi --query-gpu=memory.used,memory.total,temperature.gpu --format=csv,noheader,nounits 2>/dev/null || echo '0,1,50' #GPUV " + tok);
-            }
-            onRunningChanged: { if (running) triggered(); }
+        // ─── 2g2. data poll timer (one-shot, no reconnect) ──────
+        Component.onCompleted: {
+            // Connect all sources once at startup.
+            // Plasma executable engine keeps the subprocess alive and
+            // pushes fresh data on each update — no need to reconnect.
+            sysMon.connectSource("ps -eo %cpu --no-headers 2>/dev/null | awk -v n=\"$(nproc)\" '{s+=$1} END{printf \"%.1f\", s/n}' #CPU");
+            sysMon.connectSource("awk '/MemTotal/{t=$2} /MemAvailable/{a=$2} END{printf \"%.4f\", (t-a)/t}' /proc/meminfo #MEM");
+            sysMon.connectSource("awk '{print $1}' /proc/loadavg #LOAD");
+            sysMon.connectSource("cat /sys/class/thermal/thermal_zone0/temp 2>/dev/null || echo 0 #TEMP");
+            sysMon.connectSource("awk '/enp|wlp/{r+=$2;t+=$10} END{printf \"%d %d\", r, t}' /proc/net/dev #NET");
+            sysMon.connectSource("awk '/sd[a-z] |nvme[0-9]n[0-9] /{r+=$6;w+=$10} END{printf \"%d %d\", r, w}' /proc/diskstats #DISK");
+            sysMon.connectSource("nvidia-smi --query-gpu=memory.used,memory.total,temperature.gpu --format=csv,noheader,nounits 2>/dev/null || echo '0,1,50' #GPUV");
         }
 
         // ─── 2h. Canvas renderer ────────────────────────────────
