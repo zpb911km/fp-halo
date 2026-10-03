@@ -1,6 +1,6 @@
 # HALO — 系统数据光环
 
-> KDE Plasma 5 桌面小部件 · 系统数据 × 科幻视觉
+> KDE Plasma 6 桌面小部件 · 系统数据 × 科幻视觉
 
 一个浮在壁纸上的**系统仪表盘**——五层光环以心律失常的液压猝发节奏呼吸、闪烁、旋转，每一层映射一个硬件设备的状态。
 
@@ -16,33 +16,43 @@
 
 每个硬件一个环，每个环 2~3 种视觉维度同时表达不同参数。
 
+## 环境要求
+
+- **KDE Plasma 6**（Qt6 / KF6）。
+- 需要 `org.kde.plasma.plasma5support`（Plasma 6 自带）。
+- GPU 层依赖 `nvidia-smi`（存在才启用，缺失时该层静止，不影响其余）。
+
 ## 安装
 
-```bash
-# 方法一：从 GitHub 克隆（推荐）
-git clone https://github.com/zpb911km/fp-halo.git
-mkdir -p ~/.local/share/plasma/plasmoids/org.zpb.halo/
-cp -r fp-halo/contents fp-halo/metadata.* ~/.local/share/plasma/plasmoids/org.zpb.halo/
+### 方法一：从 GitHub 克隆（推荐）
 
-# 重启 Plasma
-killall plasmashell && plasmashell --replace & disown
+```bash
+git clone https://github.com/zpb911km/fp-halo.git
+mkdir -p ~/.local/share/plasma/plasmoids/org.zpb.halo
+rsync -a --delete --exclude='.git/' --exclude='*.plasmoid' \
+  fp-halo/ ~/.local/share/plasma/plasmoids/org.zpb.halo/
+
+# 重启 plasmashell（Plasma 6 / Wayland）
+kquitapp6 plasmashell; sleep 3
+setsid -f plasmashell --no-respawn >/tmp/plasmashell.log 2>&1
 ```
 
 然后在桌面右键 → 添加小部件 → 搜索 **HALO** → 拖到桌面。
 
 ### 方法二：`.plasmoid` 一键安装
 
-下载 `org.zpb.halo.plasmoid` 文件，双击或拖到桌面上即可自动安装。
-
 ```bash
-plasmapkg2 -i org.zpb.halo.plasmoid
+kpackagetool6 --type Plasma/Applet --install org.zpb.halo.plasmoid
+
+# 升级已安装版本：
+kpackagetool6 --type Plasma/Applet --upgrade org.zpb.halo.plasmoid
 ```
 
 ## 颜色定制
 
 每个数据层支持**双端色**：起始色（低负载/空闲）→ 终止色（高负载/繁忙），中间线性插值。
 
-在调色盘面板中为每一层分别设置。
+在小部件配置面板中为每一层分别设置。
 
 ## 手册
 
@@ -51,9 +61,11 @@ plasmapkg2 -i org.zpb.halo.plasmoid
 ## 技术栈
 
 - **QML** + **Canvas 2D** — 纯 QML 渲染，零外部依赖
-- **PlasmaCore.DataSource (executable engine)** — 通过 shell 命令采集系统数据
+- **plasma5support DataSource (executable engine)** — 通过 shell 命令采集系统数据
 - **数据来源**: `/proc/stat`, `/proc/meminfo`, `/proc/net/dev`, `/proc/diskstats`, `nvidia-smi`
 
 ## 版本
 
-v0.10 — 五层全映射: 磁盘 / CPU / 内存 / GPU / 网络
+- **v0.11** — 迁移到 Plasma 6 / Qt6：`PlasmoidItem` 根元素、`plasma5support` 数据源、
+  `metadata.json` 补 `X-Plasma-API-Minimum-Version`；配置页重写
+- **v0.10** — 五层全映射: 磁盘 / CPU / 内存 / GPU / 网络
