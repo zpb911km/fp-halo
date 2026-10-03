@@ -1,30 +1,31 @@
 // ================================================================
-// HALO — 系统数据光环 | KDE Plasma 5 Widget
-// version v0.10
+// HALO — 系统数据光环 | KDE Plasma 6 Widget
+// version v0.11 (Plasma 6 port)
 // ================================================================
 
-import QtQuick 2.15
-import QtQuick.Controls 2.15 as QQC2
-import org.kde.plasma.core 2.0 as PlasmaCore
-import org.kde.plasma.plasmoid 2.0
+import QtQuick
+import QtQuick.Controls as QQC2
+import org.kde.plasma.core as PlasmaCore
+import org.kde.plasma.plasmoid
+import org.kde.plasma.plasma5support as P5Support
 
 // ================================================================
 // 1. ROOT — Plasmoid shell
 // ================================================================
 
-Item {
+PlasmoidItem {
     id: root
     width:  400
     height: 400
 
-    Plasmoid.backgroundHints:        PlasmaCore.Types.NoBackground
-    Plasmoid.preferredRepresentation: Plasmoid.fullRepresentation
+    Plasmoid.backgroundHints: PlasmaCore.Types.NoBackground
+    preferredRepresentation: fullRepresentation
 
     // ============================================================
     // 2. fullRepresentation — main widget surface
     // ============================================================
 
-    Plasmoid.fullRepresentation: Item {
+    fullRepresentation: Item {
         id: w
         anchors.fill: parent
 
@@ -209,9 +210,8 @@ Item {
             var total = (sysNetDown + sysNetUp) / (maxNet * 2);
             netRotSpd = 0.5 + Math.min(1, total) * 2.5;
 
-            // force UI refresh
+            // force UI refresh (仅刷新 debug Text；绘制统一由动画 Timer 驱动)
             paintTick++;
-            if (cv) cv.requestPaint();
         }
 
         // ─── 2d. animation state ────────────────────────────────
@@ -383,7 +383,8 @@ Item {
         /* manual arc drawer (bypass Qt arc() undersampling for small arcs) */
         function arcAt(ctx, cx, cy, r, sa, ea) {
             var span = ea - sa;
-            var n = Math.max(4, Math.round(span * r * 0.5));
+            // 限制单弧最大段数，防止渲染过载（400px canvas 96 段足够平滑）
+            var n = Math.max(4, Math.min(96, Math.round(span * r * 0.5)));
             var stp = span / n;
             for (var j = 0; j <= n; j++) {
                 var a = sa + j * stp;
@@ -395,85 +396,98 @@ Item {
         }
 
         // ─── 2g. system monitor (executable engine) ──────────
-        PlasmaCore.DataSource {
+        P5Support.DataSource {
             id: sysMon
             engine: "executable"
-            interval: 2000
+            interval: 3000
             connectedSources: []
 
-            onNewData: {
+            onNewData: (sourceName, data) => {
+                // 单个合并脚本输出，每行带类型标记：
+                //   C <cpu%> / M <memfrac> / L <load> / T <temp°C>
+                //   N <rxBytes> <txBytes> / D <readSect> <writeSect> / G <usedMiB> <totalMiB> <temp>
                 var out = (data["stdout"] || "").trim();
-                var src = sourceName;
-
-                if (src.indexOf("#CPU") >= 0) {
-                    w.sysCpu = Math.min(100, parseFloat(out) || 0);
-                } else if (src.indexOf("#MEM") >= 0) {
-                    w.sysMem = (parseFloat(out) || 0) * 100;
-                } else if (src.indexOf("#LOAD") >= 0) {
-                    w.sysLoad = parseFloat(out) || 0;
-                } else if (src.indexOf("#TEMP") >= 0) {
-                    var t = parseInt(out) / 1000;
-                    w.sysTemp = isNaN(t) ? 40 : Math.max(20, Math.min(100, t));
-                } else if (src.indexOf("#NET") >= 0) {
-                    var parts = out.split(/\s+/);
-                    if (parts.length >= 2) {
-                        var now = Date.now();
-                        var d = parseInt(parts[0]) || 0;
-                        var u = parseInt(parts[1]) || 0;
-                        if (w._netTime > 0) {
-                            var dt = (now - w._netTime) / 1000;
-                            if (dt > 0.1) {
-                                w.sysNetDown = Math.max(0, (d - w._netPrev.d) / dt);
-                                w.sysNetUp   = Math.max(0, (u - w._netPrev.u) / dt);
-                            }
-                        }
-                        w._netPrev = { d: d, u: u };
-                        w._netTime = now;
+                if (!out) return;
+                var lines = out.split('\n');
+                for (var li = 0; li < lines.length; li++) {
+                    var line = lines[li].trim();
+                    if (!line) continue;
+                    var p = line.split(/\s+/);
+                    switch (p[0]) {
+                    case "C":
+                        w.sysCpu = Math.min(100, parseFloat(p[1]) || 0);
+                        break;
+                    case "M":
+                        w.sysMem = (parseFloat(p[1]) || 0) * 100;
+                        break;
+                    case "L":
+                        w.sysLoad = parseFloat(p[1]) || 0;
+                        break;
+                    case "T": {
+                        var t = parseFloat(p[1]) || 0;
+                        w.sysTemp = isNaN(t) ? 40 : Math.max(20, Math.min(100, t));
+                        break;
                     }
-                } else if (src.indexOf("#DISK") >= 0) {
-                    var parts = out.split(/\s+/);
-                    if (parts.length >= 2) {
-                        var now = Date.now();
-                        var r = parseInt(parts[0]) || 0;
-                        var w_ = parseInt(parts[1]) || 0;
-                        if (w._diskTime > 0) {
-                            var dt = (now - w._diskTime) / 1000;
-                            if (dt > 0.1) {
-                                w.sysDiskRead  = Math.max(0, (r - w._diskPrev.r) / dt);
-                                w.sysDiskWrite = Math.max(0, (w_ - w._diskPrev.w) / dt);
+                    case "N": {
+                        if (p.length >= 3) {
+                            var now = Date.now();
+                            var d = parseInt(p[1]) || 0;
+                            var u = parseInt(p[2]) || 0;
+                            if (w._netTime > 0) {
+                                var dt = (now - w._netTime) / 1000;
+                                if (dt > 0.1) {
+                                    w.sysNetDown = Math.max(0, (d - w._netPrev.d) / dt);
+                                    w.sysNetUp   = Math.max(0, (u - w._netPrev.u) / dt);
+                                }
                             }
+                            w._netPrev = { d: d, u: u };
+                            w._netTime = now;
                         }
-                        w._diskPrev = { r: r, w: w_ };
-                        w._diskTime = now;
+                        break;
                     }
-                } else if (src.indexOf("#GPUV") >= 0) {
-                    // nvidia-smi: "used, total, temp"
-                    var parts = out.split(',');
-                    if (parts.length >= 3) {
-                        var used = parseFloat(parts[0]) || 0;
-                        var total = parseFloat(parts[1]) || 1;
-                        w.sysGpu = Math.min(100, Math.max(0, used / total * 100));
-                        w.sysGpuTemp = parseFloat(parts[2]) || 50;
+                    case "D": {
+                        if (p.length >= 3) {
+                            var now = Date.now();
+                            var r = parseInt(p[1]) || 0;
+                            var w_ = parseInt(p[2]) || 0;
+                            if (w._diskTime > 0) {
+                                var dt = (now - w._diskTime) / 1000;
+                                if (dt > 0.1) {
+                                    w.sysDiskRead  = Math.max(0, (r - w._diskPrev.r) / dt);
+                                    w.sysDiskWrite = Math.max(0, (w_ - w._diskPrev.w) / dt);
+                                }
+                            }
+                            w._diskPrev = { r: r, w: w_ };
+                            w._diskTime = now;
+                        }
+                        break;
+                    }
+                    case "G": {
+                        if (p.length >= 4) {
+                            var used = parseFloat(p[1]) || 0;
+                            var total = parseFloat(p[2]) || 1;
+                            w.sysGpu = Math.min(100, Math.max(0, used / total * 100));
+                            w.sysGpuTemp = parseFloat(p[3]) || 50;
+                        }
+                        break;
+                    }
                     }
                 }
                 // recompute modulation factors after any data update
+                // (不在此处 requestPaint：统一由动画 Timer 驱动重绘，避免双源竞争)
                 w.computeModulation();
             }
         }
 
-        // ─── 2g2. data poll timer (one-shot, no reconnect) ──────
-        Component.onCompleted: {
-            // Connect all sources once at startup.
-            // Plasma executable engine keeps the subprocess alive and
-            // pushes fresh data on each update — no need to reconnect.
-            sysMon.connectSource("ps -eo %cpu --no-headers 2>/dev/null | awk -v n=\"$(nproc)\" '{s+=$1} END{printf \"%.1f\", s/n}' #CPU");
-            sysMon.connectSource("awk '/MemTotal/{t=$2} /MemAvailable/{a=$2} END{printf \"%.4f\", (t-a)/t}' /proc/meminfo #MEM");
-            sysMon.connectSource("awk '{print $1}' /proc/loadavg #LOAD");
-            sysMon.connectSource("cat /sys/class/thermal/thermal_zone0/temp 2>/dev/null || echo 0 #TEMP");
-            sysMon.connectSource("awk '/enp|wlp/{r+=$2;t+=$10} END{printf \"%d %d\", r, t}' /proc/net/dev #NET");
-            sysMon.connectSource("awk '/sd[a-z] |nvme[0-9]n[0-9] /{r+=$6;w+=$10} END{printf \"%d %d\", r, w}' /proc/diskstats #DISK");
-            sysMon.connectSource("nvidia-smi --query-gpu=memory.used,memory.total,temperature.gpu --format=csv,noheader,nounits 2>/dev/null || echo '0,1,50' #GPUV");
-        }
+        // ─── 2g2. data poll ─────────────────────────────────────
+        // 系统数据轮询在 2l lifecycle 的 Component.onCompleted 中
+        // 一次性连接（单 source 合并脚本），此后 engine 持续推送，不再重复 connect。
+        // ── 为什么不能每 2 秒 disconnect/reconnect？────────────
+        // 旧版 pollTimer 每轮先 disconnect 全部旧 source、再 connect 7 个
+        // 带随机 token 的新 source。disconnectSource 是异步的，追不上新 source
+        // 的产生 → executable engine 内 QProcess 无限累积 →
+        // 运行数小时后 plasmashell CPU/内存持续增长、widget 一卡一卡。
+        // 同时旧版 nvidia-smi 无 timeout 保护，驱动异常时进程堆积雪上加霜。
 
         // ─── 2h. Canvas renderer ────────────────────────────────
         Canvas {
@@ -728,8 +742,8 @@ Item {
                                         verticalAlignment: TextInput.AlignVCenter
                                         horizontalAlignment: TextInput.AlignHCenter
                                         leftPadding:  6; rightPadding: 6
-                                        validator: RegExpValidator {
-                                            regExp: /^#[0-9a-fA-F]{6}$/
+                                        validator: RegularExpressionValidator {
+                                            regularExpression: /^#[0-9a-fA-F]{6}$/
                                         }
                                         onEditingFinished: {
                                             var t = text.trim();
@@ -777,8 +791,8 @@ Item {
                                         verticalAlignment: TextInput.AlignVCenter
                                         horizontalAlignment: TextInput.AlignHCenter
                                         leftPadding:  6; rightPadding: 6
-                                        validator: RegExpValidator {
-                                            regExp: /^#[0-9a-fA-F]{6}$/
+                                        validator: RegularExpressionValidator {
+                                            regularExpression: /^#[0-9a-fA-F]{6}$/
                                         }
                                         onEditingFinished: {
                                             var t = text.trim();
@@ -802,12 +816,13 @@ Item {
             }
         }
 
-        // ─── 2k. animation timer ────────────────────────────────
+        // ─── 2k. animation timer (25fps 足够，慢速光环动画) ─────
         Timer {
             id: ft
-            interval: 16
+            interval: 40
             repeat:   true
-            running:  true
+            // 不可见时暂停动画，节省 CPU
+            running:  visible && stReady
 
             onTriggered: {
                 if (!stReady || st.length === 0) return;
@@ -825,7 +840,28 @@ Item {
         Component.onCompleted: {
             syncColors();
             initState();
+            // 一次性连接系统数据轮询：7 个独立进程 → 1 个脚本一次读完 /proc
+            // （纯本机、极快）；nvidia-smi 放最后并用 timeout 保护，防止挂起。
+            sysMon.connectSource(""
+                + "printf 'C '; ps -eo %cpu --no-headers 2>/dev/null | awk -v n=\"$(nproc)\" '{s+=$1} END{printf \"%.1f\\n\", s/n}' ; "
+                + "printf 'M '; awk '/MemTotal/{t=$2} /MemAvailable/{a=$2} END{printf \"%.4f\\n\", (t-a)/t}' /proc/meminfo; "
+                + "printf 'L '; awk '{print $1}' /proc/loadavg; "
+                + "printf 'T '; awk '{printf \"%d\\n\", $1/1000}' /sys/class/thermal/thermal_zone0/temp 2>/dev/null || echo 0; "
+                + "printf 'N '; awk '/enp|wlp/{r+=$2;t+=$10} END{printf \"%d %d\\n\", r, t}' /proc/net/dev; "
+                + "printf 'D '; awk '/sd[a-z] |nvme[0-9]n[0-9] /{r+=$6;w+=$10} END{printf \"%d %d\\n\", r, w}' /proc/diskstats; "
+                + "if command -v nvidia-smi >/dev/null 2>&1; then "
+                + "printf 'G '; timeout 2 nvidia-smi --query-gpu=memory.used,memory.total,temperature.gpu --format=csv,noheader,nounits 2>/dev/null | awk -F', *' '{gsub(/ /,\"\",$1); gsub(/ /,\"\",$2); gsub(/ /,\"\",$3); printf \"%s %s %s\\n\", $1, $2, $3}'; "
+                + "fi"
+                + "");
             cv.requestPaint();
+        }
+
+        Component.onDestruction: {
+            // 停动画、断开全部轮询源，避免 Plasma engine 侧残留
+            ft.running = false;
+            var cs = sysMon.connectedSources;
+            for (var i = 0; i < cs.length; i++)
+                sysMon.disconnectSource(cs[i]);
         }
 
         onVisibleChanged: {
