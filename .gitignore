@@ -4,6 +4,10 @@
 # build artifacts
 *.plasmoid
 
+# python bytecode
+__pycache__/
+*.pyc
+
 # web pages accidentally saved
 *.html
 

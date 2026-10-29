@@ -3,9 +3,9 @@
     "KPlugin": {
         "Id": "org.zpb.halo",
         "Name": "HALO",
-        "Description": "系统数据光环 — 五层光环映射磁盘/CPU/内存/GPU/网络",
+        "Description": "系统数据光环 — 复刻雨世界迭代器 Halo #2139，CPU/内存/温度/磁盘/GPU/网络/负载各占一个原版视觉自由度",
         "Category": "Miscellaneous",
-        "Version": "0.10",
+        "Version": "1.0",
         "License": "GPL-2.0+",
         "ServiceTypes": ["Plasma/Applet"],
         "Icon": "applications-graphics",

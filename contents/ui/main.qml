@@ -8,6 +8,7 @@ import QtQuick.Controls as QQC2
 import org.kde.plasma.core as PlasmaCore
 import org.kde.plasma.plasmoid
 import org.kde.plasma.plasma5support as P5Support
+import "halo2139.js" as Halo
 
 // ================================================================
 // 1. ROOT — Plasmoid shell
@@ -30,62 +31,32 @@ PlasmoidItem {
         anchors.fill: parent
 
         // ─── 2a. layout constants ───────────────────────────────
-        readonly property real sf:        Math.min(width, height) / 400
-        readonly property real gap:       3
-        readonly property real minThick:  1.5
-        readonly property real maxR:      195
-        readonly property string version: "v0.10"
+        readonly property string version: "v1.0 (Halo #2139)"
 
-        // ─── 2b. per-layer animation config ─────────────────────
-        readonly property var layerConf: [
-            //   dashAngles (deg)                 flashMs  rotate  rotMs
-            {  dashAngles: [],                        fMs: 3000,  rot: false, rotMs: 0 },
-            {  dashAngles: [1.1, 18.9],               fMs: 5000,  rot: true,  rotMs: 23000 },
-            {  dashAngles: [],                        fMs: 7000,  rot: false, rotMs: 0 },
-            {  dashAngles: [1, 2.6, 1, 19.4],         fMs: 11000, rot: true,  rotMs: 29000 },
-            {  dashAngles: [0.65, 4.35],              fMs: 13000, rot: true,  rotMs: 31000 },
-        ]
+        // ─── 2b. halo state（Halo #2139，IL 原样移植）─────────────
+        // 状态机在 halo2139.js 里，与 tools/halo2139_sim.py 逐函数对应。
+        // 规格书：docs/HALO_2139_SPEC.md
+        property var halo: null
 
-        readonly property var layerPulse: [
-            //   innerInterval  outerInterval  transitionDur
-            {  iInt: 2200,  oInt: 3100,  tDur: 600 },
-            {  iInt: 2800,  oInt: 3700,  tDur: 500 },
-            {  iInt: 3400,  oInt: 4300,  tDur: 450 },
-            {  iInt: 4100,  oInt: 5200,  tDur: 550 },
-            {  iInt: 4800,  oInt: 6100,  tDur: 500 },
-        ]
+        // 缩放：把「游戏单位」映射到屏幕像素，组件任意尺寸都成立。
+        //   Halo.GAME_EXTENT = 57 = 常态外沿（外圈 bit 环半径 55 + 径向半厚 2）
+        //   inscribe = 1.0 → 常态外沿【正好内接】于组件矩形
+        //   inscribe > 1.0 → 整体缩小，为 IL 自身的大脉冲（expand 可达 2.0，
+        //                  每约 32 秒一次）留出余量，避免被 Canvas 边界切平
+        readonly property real inscribe: 1.0
+        readonly property real haloScale: {
+            var d = Math.min(width, height);
+            return d > 0 ? (d / 2) / (Halo.GAME_EXTENT * inscribe) : 1;
+        }
 
-        readonly property var flickerKfs: [
-            [ [0,0.4],[0.42,0.4],[0.43,0],[0.44,0.4],[0.45,0.1],[0.46,0.4],
-              [0.78,0.4],[0.79,0],[0.80,0.4],[1,0.4] ],
-            [ [0,0.8],[0.30,0.8],[0.31,0],[0.32,0.8],[0.33,0.1],[0.34,0.8],
-              [0.65,0.8],[0.66,0],[0.67,0.8],[1,0.8] ],
-            [ [0,0.6],[0.53,0.6],[0.54,0],[0.55,0.6],[0.89,0.6],[0.90,0.1],[0.91,0.6],[1,0.6] ],
-            [ [0,0.8],[0.23,0.8],[0.24,0],[0.25,0.8],[0.26,0.1],[0.27,0.8],
-              [0.61,0.8],[0.62,0],[0.63,0.8],[1,0.8] ],
-            [ [0,0.8],[0.17,0.8],[0.18,0],[0.19,0.8],[0.47,0.8],[0.48,0.1],[0.49,0.8],
-              [0.73,0.8],[0.74,0],[0.75,0.8],[1,0.8] ],
-        ]
+        // ─── 数据调制槽位（computeModulation 写入；1/0 = 原版行为）───
+        // 每个槽位都对应 Halo 里一个【真实存在】的自由度，不新增几何。
+        property real modSizeGain:   1.0        // ← CPU  ：整体尺寸倍率 0.80..1.00
+        property real modRing1Thick: 3.0        // ← 内存：环 1 粗细（游戏单位，3 = 原版）
+        property real modWhiteForce: 0.0        // ← 温度：0..1 强制环 0 变实心墨盘
+        property var  modBitGain:    [1.0, 1.0, 1.0]  // ← 磁盘/GPU/网络：三环活跃度
+        property real modRotSpeed:   1.0        // ← 负载：旋转急促度
 
-        readonly property var rotKfs: [
-            [],
-            [ [0,0],[0.10,0],[0.20,60],[0.30,60],
-
-              [0.45,120],[0.60,120],[0.75,240],[0.90,240],[1,360] ],
-            [],
-            [ [0,0],[0.15,0],[0.25,-90],[0.40,-90],
-              [0.55,-180],[0.70,-180],[0.85,-270],[0.95,-270],[1,-360] ],
-            [ [0,0],[0.05,0],[0.15,45],[0.25,45],[0.35,90],[0.50,90],
-              [0.65,180],[0.80,180],[0.90,270],[0.95,270],[1,360] ],
-        ]
-
-        readonly property var initBounds: [
-            { i:20,  o:80  },
-            { i:115, o:125 },
-            { i:136, o:138 },
-            { i:150, o:162 },
-            { i:175, o:185 },
-        ]
         // ─── 2b2. system data (polled from /proc) ──────────────
         property real sysCpu:   0       // 0..100
         property real sysMem:   0       // 0..100
@@ -210,14 +181,31 @@ PlasmoidItem {
             var total = (sysNetDown + sysNetUp) / (maxNet * 2);
             netRotSpd = 0.5 + Math.min(1, total) * 2.5;
 
+            // ── 映射到 Halo #2139 的真实自由度 ──────────────────
+            // 原则：每个物理量占一个【原版本来就有的】槽位，不新增几何。
+            //   尺寸倍率  ← CPU      （只减不增，保证常态不越出组件边界）
+            //   环 1 粗细 ← 内存     （3 = 原版细环；满 = 55% 半径的厚环）
+            //   环 0 实心 ← 温度     （≥70°C 起渐入，white→1 时整盘是实心墨）
+            //   三环活跃  ← 磁盘/GPU/网络
+            //   旋转急促  ← 平均负载
+            modSizeGain   = 0.80 + 0.20 * cpuMix;
+            modRotSpeed   = 0.60 + Math.min(1, sysLoad / 2.0) * 1.90;
+
+            // 环 1：3px（原版）→ 最多 55% 半径。用 radius(1)=40 游戏单位换算
+            modRing1Thick = 3.0 + (40.0 * 0.55 - 3.0) * memMix;
+
+            // 环 0：温度告警。70°C 起，90°C 全实心
+            modWhiteForce = Math.max(0, Math.min(1, (sysTemp - 70) / 20));
+
+            modBitGain = [ 0.30 + 0.70 * diskColorMix,     // 内环 10 齿  ← 磁盘
+                           0.30 + 0.70 * gpuColorMix,      // 中环 30 齿  ← GPU
+                           0.30 + 0.70 * netMix ];         // 外环 60 齿  ← 网络
+
             // force UI refresh (仅刷新 debug Text；绘制统一由动画 Timer 驱动)
             paintTick++;
         }
 
-        // ─── 2d. animation state ────────────────────────────────
-        property var  st:       []
-        property var  t0:       0
-        property bool stReady:  false
+        // ─── 2d. animation state ── 见 2b（halo）───────────────
 
         // ─── 2e. color helpers (hex with optional alpha) ────────
         function parseColor(hex) {
@@ -244,155 +232,6 @@ PlasmoidItem {
             return '#' + r.toString(16).padStart(2,'0')
                      + g.toString(16).padStart(2,'0')
                      + b.toString(16).padStart(2,'0');
-        }
-
-        // ─── 2f. animation math functions ───────────────────────
-
-        /* cubic‑bezier solver (0,0)–(0.4,0.2)–(1,1) */
-        function cb(t) {
-            var bx = 0.4, by = 0.2, g = t;
-            for (var i = 0; i < 8; i++) {
-                var x  = 3*bx*g*(1-g)*(1-g) + 3*by*g*g*(1-g) + g*g*g - t;
-                var dx = 3*bx*(1-g)*(1-g) - 6*bx*g*(1-g) + 3*by*g*(2-3*g) + 3*g*g;
-                if (Math.abs(x) < 1e-6) break;
-                g -= x / dx; g = Math.max(0, Math.min(1, g));
-            }
-            return 3*0*g*(1-g)*(1-g) + 3*1*g*g*(1-g) + g*g*g;
-        }
-
-        /* linear eval of keyframe table */
-        function ev(k, p) {
-            if (p <= k[0][0]) return k[0][1];
-            if (p >= k[k.length-1][0]) return k[k.length-1][1];
-            for (var i = 0; i < k.length-1; i++) {
-                if (p >= k[i][0] && p < k[i+1][0]) {
-                    var seg = (p - k[i][0]) / (k[i+1][0] - k[i][0]);
-                    return k[i][1] + (k[i+1][1] - k[i][1]) * seg;
-                }
-            }
-            return k[0][1];
-        }
-
-        /* bezier‑eased eval of rotation keyframes */
-        function evr(k, p) {
-            if (p <= k[0][0]) return k[0][1];
-            if (p >= k[k.length-1][0]) return k[k.length-1][1];
-            for (var i = 0; i < k.length-1; i++) {
-                if (p >= k[i][0] && p < k[i+1][0]) {
-                    var seg = (p - k[i][0]) / (k[i+1][0] - k[i][0]);
-                    return k[i][1] + (k[i+1][1] - k[i][1]) * cb(seg);
-                }
-            }
-            return k[0][1];
-        }
-
-        /* ease‑out cubic */
-        function eoc(t) { return 1 - Math.pow(1 - t, 3); }
-
-        /* next pulse time with jitter */
-        function npt(a) { return a * (0.3 + Math.random() * 2.2); }
-
-        /* update a single channel (inner/outer) */
-        function uc(ch, now, li, ct) {
-            if (now >= ch.np) {
-                ch.f = ch.c;
-                var b = [];
-                for (var bi = 0; bi < st.length; bi++)
-                    b.push({ i: st[bi].ii.c, o: st[bi].oo.c });
-
-                var mn, mx;
-                if (ct === 'i') {
-                    mn = (li === 0) ? 0 : b[li-1].o + gap;
-                    mx = Math.min(b[li].o - minThick,
-                                  (li === 4) ? maxR - minThick
-                                             : b[li+1].i - gap - minThick);
-                } else {
-                    mn = b[li].i + minThick;
-                    mx = (li === 4) ? maxR : b[li+1].i - gap;
-                }
-                if (mn > mx) { ch.np = now + npt(ch.iv); return; }
-                ch.t  = mn + Math.random() * (mx - mn);
-                ch.st = now;
-                ch.d  = ch.td * (0.6 + Math.random() * 0.8);
-                // modulate pulse speed by system data (higher factor = faster = more agitated)
-                if (li === 0) ch.d /= Math.max(0.3, w.diskColorMix * 1.5 + 0.2);
-                if (li === 1) ch.d /= Math.max(0.3, w.cpuPulse);
-                if (li === 3) ch.d /= Math.max(0.3, w.gpuPulse);
-                if (li === 4) ch.d /= Math.max(0.3, w.netPulse);
-                ch.np = now + ch.d + npt(ch.iv);
-            }
-            if (now < ch.st + ch.d) {
-                var pr = (now - ch.st) / ch.d;
-                ch.c = ch.f + (ch.t - ch.f) * eoc(Math.min(pr, 1));
-            } else {
-                ch.c = ch.t;
-            }
-        }
-
-        /* enforce boundary constraints (iterative) */
-        function enf() {
-            for (var it = 0; it < 3; it++) {
-                for (var i = 0; i < st.length; i++) {
-                    if (i === 0)
-                        st[i].ii.c = Math.max(0, st[i].ii.c);
-                    else
-                        st[i].ii.c = Math.max(st[i-1].oo.c + gap, st[i].ii.c);
-
-                    if (i === st.length-1)
-                        st[i].oo.c = Math.min(maxR, st[i].oo.c);
-                    else
-                        st[i].oo.c = Math.min(st[i+1].ii.c - gap, st[i].oo.c);
-
-                    if (st[i].oo.c < st[i].ii.c + minThick) {
-                        if (i === st.length-1 ||
-                            st[i].oo.c + minThick <= st[i+1].ii.c - gap)
-                            st[i].oo.c = st[i].ii.c + minThick;
-                        else
-                            st[i].ii.c = st[i].oo.c - minThick;
-                    }
-                }
-            }
-        }
-
-        /* initialise all channels */
-        function initState() {
-            var n = Date.now();
-            t0 = n;
-            var s = [];
-            for (var i = 0; i < 5; i++) {
-                var p = layerPulse[i];
-                s.push({
-                    ii: {
-                        c:  initBounds[i].i, t: initBounds[i].i, f: initBounds[i].i,
-                        st: 0, d: 600,
-                        np: n + Math.random() * p.iInt,
-                        iv: p.iInt, td: p.tDur
-                    },
-                    oo: {
-                        c:  initBounds[i].o, t: initBounds[i].o, f: initBounds[i].o,
-                        st: 0, d: 600,
-                        np: n + Math.random() * p.oInt,
-                        iv: p.oInt, td: p.tDur
-                    },
-                });
-            }
-            st = s;
-            stReady = true;
-        }
-
-        /* manual arc drawer (bypass Qt arc() undersampling for small arcs) */
-        function arcAt(ctx, cx, cy, r, sa, ea) {
-            var span = ea - sa;
-            // 限制单弧最大段数，防止渲染过载（400px canvas 96 段足够平滑）
-            var n = Math.max(4, Math.min(96, Math.round(span * r * 0.5)));
-            var stp = span / n;
-            for (var j = 0; j <= n; j++) {
-                var a = sa + j * stp;
-                if (j === 0)
-                    ctx.moveTo(cx + r * Math.cos(a), cy + r * Math.sin(a));
-                else
-                    ctx.lineTo(cx + r * Math.cos(a), cy + r * Math.sin(a));
-            }
         }
 
         // ─── 2g. system monitor (executable engine) ──────────
@@ -494,73 +333,32 @@ PlasmoidItem {
             id: cv
             anchors.fill: parent
             antialiasing: true
+            clip: true              // IL 的大脉冲会超出常态外沿，裁到组件内
 
             onPaint: {
                 var ctx = getContext("2d");
                 ctx.clearRect(0, 0, width, height);
-                if (!stReady || st.length === 0) return;
+                if (!halo) return;
 
-                var el   = Date.now() - t0;
-                var s    = w.sf;
-                var cx   = width  / 2;
-                var cy   = height / 2;
-
-                for (var i = 0; i < 5; i++) {
-                    var ci = st[i].ii.c * s;
-                    var co = st[i].oo.c * s;
-                    var r  = (ci + co) / 2;
-                    var sw = Math.max(co - ci, 0.1);
-
-                    ctx.save();
-
-                    // rotation transform (modulated by system data for layers 1,4)
-                    if (layerConf[i].rot) {
-                        var effMs = layerConf[i].rotMs;
-                        if (i === 1) effMs = layerConf[1].rotMs / Math.max(0.05, w.cpuRotSpd);
-                        if (i === 3) effMs = layerConf[3].rotMs / Math.max(0.05, w.gpuRotSpd);
-                        if (i === 4) effMs = layerConf[4].rotMs / Math.max(0.05, w.netRotSpd);
-                        var a = evr(rotKfs[i],
-                                    (el % effMs) / effMs);
-                        ctx.translate(cx, cy);
-                        ctx.rotate(a * Math.PI / 180);
-                        ctx.translate(-cx, -cy);
-                    }
-
-                    // colour & opacity
-                    ctx.strokeStyle = parseColor(getColor(i));
-                    ctx.lineWidth   = sw;
-                    var alpha = ev(flickerKfs[i],
-                                   (el % layerConf[i].fMs) / layerConf[i].fMs);
-                    if (i === 2) alpha *= Math.min(1.5, Math.max(0.2, w.memBright));
-                    ctx.globalAlpha = Math.min(1, Math.max(0, alpha));
-
-                    // draw
-                    var da = layerConf[i].dashAngles;
-                    if (da.length > 0) {
-                        var cycleTotal = 0;
-                        for (var d = 0; d < da.length; d++) cycleTotal += da[d];
-                        var numTeeth = Math.round(360 / cycleTotal);
-                        ctx.beginPath();
-                        for (var k = 0; k < numTeeth; k++) {
-                            var ang = k * cycleTotal;
-                            for (var seg = 0; seg < da.length; seg++) {
-                                if (seg % 2 === 0) {
-                                    var sr = ang * Math.PI / 180;
-                                    var er = (ang + da[seg]) * Math.PI / 180;
-                                    arcAt(ctx, cx, cy, r, sr, er);
-                                }
-                                ang += da[seg];
-                            }
-                        }
-                    } else {
-                        ctx.beginPath();
-                        ctx.arc(cx, cy, r, 0, Math.PI * 2);
-                    }
-                    ctx.stroke();
-                    ctx.restore();
-                }
+                Halo.draw(ctx, halo, {
+                    cx: width / 2,
+                    cy: height / 2,
+                    s:  haloScale,
+                    // 5 个径向元素 ← 5 个颜色槽（沿用原有颜色配置的硬件语义）
+                    ring0: parseColor(getColor(1)),       // 环 0        ← CPU
+                    ring1: parseColor(getColor(2)),       // 环 1        ← 内存
+                    bits:  [ parseColor(getColor(0)),     // 内环 10 齿  ← 磁盘
+                             parseColor(getColor(3)),     // 中环 30 齿  ← GPU
+                             parseColor(getColor(4)) ],   // 外环 60 齿  ← 网络
+                    sizeGain:   modSizeGain,
+                    ring1Thick: modRing1Thick,
+                    whiteForce: modWhiteForce,
+                    bitGain:    modBitGain,
+                    alpha:      1.0
+                });
             }
         }
+
 
         // ─── 2h. version badge ──────────────────────────────────
         Text {
@@ -816,30 +614,27 @@ PlasmoidItem {
             }
         }
 
-        // ─── 2k. animation timer (25fps 足够，慢速光环动画) ─────
+        // ─── 2k. animation timer ────────────────────────────────
+        // IL 的动画以 40 tick/s（游戏帧率）推进，这里同频驱动状态机与重绘。
         Timer {
             id: ft
-            interval: 40
+            interval: 1000 / Halo.TICK_HZ
             repeat:   true
-            // 不可见时暂停动画，节省 CPU
-            running:  visible && stReady
+            running:  visible && halo !== null
 
             onTriggered: {
-                if (!stReady || st.length === 0) return;
-                var now = Date.now();
-                for (var i = 0; i < 5; i++) {
-                    uc(st[i].ii, now, i, 'i');
-                    uc(st[i].oo, now, i, 'o');
-                }
-                enf();
+                if (!halo) return;
+                halo.rotSpeed = modRotSpeed;   // 唯一需要写回状态机的调制量
+                Halo.step(halo);
                 cv.requestPaint();
             }
         }
 
+
         // ─── 2l. lifecycle ──────────────────────────────────────
         Component.onCompleted: {
             syncColors();
-            initState();
+            halo = Halo.create();
             // 一次性连接系统数据轮询：7 个独立进程 → 1 个脚本一次读完 /proc
             // （纯本机、极快）；nvidia-smi 放最后并用 timeout 保护，防止挂起。
             sysMon.connectSource(""
@@ -865,7 +660,7 @@ PlasmoidItem {
         }
 
         onVisibleChanged: {
-            if (visible && stReady)
+            if (visible && halo)
                 cv.requestPaint();
         }
     }
