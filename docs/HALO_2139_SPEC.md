@@ -195,10 +195,41 @@ for j in 0..19:
     prev    = q
 ```
 
-- `c.stuckAt = Room 中心 + RNV() * Lerp(300, 500, Random.value)`，且先被 `Clamp` 到
-  `oracle.arm.cornerPositions` 包围盒内、再与原始点 `Lerp(0.5)` 混合。
-- `c.handle = c.stuckAt + RNV() * Lerp(400, 700, Random.value)` —— **随机方向**，
-  因此四个控制点一般不共线，曲线是被"从随机远点拽回"的大弧。
+#### 4.3.1 锚点与手柄（`Halo.Connection::.ctor`，已逐条核对 IL）
+
+```csharp
+// 调用方 Halo::.ctor
+pos = new Vector2(room.PixelWidth/2f, room.PixelHeight/2f)  // 房间中心
+    + Custom.RNV() * Lerp(300f, 500f, Random.value);        // RNV = DegToVec(value*360°)
+new Connection(this, pos);
+
+// 构造器
+p = pos;
+p.x = Clamp(p.x, arm.cornerPositions[0].x, arm.cornerPositions[1].x);
+p.y = Clamp(p.y, arm.cornerPositions[2].y, arm.cornerPositions[1].y);
+stuckAt = Lerp(pos, p, 0.5f);          // 落在盒内则原样，盒外只拉回一半
+handle  = pos + RNV() * Lerp(400f, 700f, Random.value);  // 基点是 pos，不是 stuckAt
+```
+
+- 锚点环**以房间中心为圆心**，与 halo 自身位置无关。
+- `handle` 的基础点是被夹**之前**的 `pos`；两者重合仅当不发生夹取。
+- `arm_box=None` 时不做夹取。`cornerPositions` 由 `OracleArm::.ctor/Update` 按关节位置
+  逐帧算出、随手臂动画变化，无法只从 Halo 的 IL 推出。夹取强度实测（锚点环 300~500）：
+
+| arm_box | mean \|stuckAt\| |
+|---|---|
+| 无（None） | 399.8 |
+| 200×150 | 255.9 |
+| 400×300 | 308.2 |
+| 800×500 | 370.9 |
+| 1200×700 | 392.3 |
+
+> 采样：每档 800 条（seed 1000..1039 × 20 条），距离相对房间中心。单 seed 只有 20 条，
+> 标准误约 ±15，**不要用单 seed 复核本表**。CLI 可对照跑：
+> `python3 tools/halo2139_sim.py stats --arm-box X0 Y0 X1 Y1`
+
+- `handle` 是**随机方向**（`RNV()` 每次重抽角度），因此四个控制点一般不共线，
+  曲线是被"从随机远点拽回"的大弧。
 - **起点 `a = stuckAt`（r≈430，边框），终点 `c = Center + dir*Radius(2,t)`（r≈50，正好停在
   halo 外环 40px 之外）**。所以连线是"从边框甩到 halo 边缘"的曲线：一端在边框、
   一端贴在 halo 上，且不进入 halo 内部。
@@ -316,7 +347,7 @@ if (Random.value < 1f/160f || flag) {
 }
 if (Random.value < 1f/160f || flag) {
     if (Random.value < 0.5f && flag)
-        getToPush = (float)(Random.Range(-1,0) + Random.Range(1,6));  // ∈ {0..5}
+        getToPush = (float)(Random.Range(-1,0) + Random.Range(1,6));  // ∈ {0..4}
     else
         getToPush = 0f;
 }
@@ -325,7 +356,7 @@ if (Random.value < 1f/160f || flag) {
 **三个易错点（均由 IL 逐条走 opcode 确认，勿按直觉改写）：**
 
 1. **两个块各消耗一次独立的 `Random.value`**，进入块后再消耗一次；**只有 `rnd<0.5 && flag` 才给增益**，其余一切情况都归位到中性值（1 / 0）。写成 `rnd>=0.5` 是取反错误（分布上等价，但语义错）。
-2. **`Random.Range(-1,0)` 是 `[min,max)` 的整数区间，含 -1 和 0 两个值**；加 `Range(1,6)`（1..5）后取值 **0..5**，均值 2.5。若误当成"只有 -1"，则整条分布下移。
+2. **`Random.Range(int,int)` 上界不含**（MemberRef 签名 `00 02 08 08 08` = `(int32,int32)->int32`）：`Range(-1,0)` **恒为 -1**，`Range(1,6)` 为 1..5，故 `getToPush ∈ 0..4`、均值 2.0。此处曾被误当作 `{-1,0}`（取值 0..5、均值 2.5），导致 `push` 均值偏高、半径整体偏大，详见第 6 节订正记录。**即便区间退化，两次 `Range` 仍各消耗一个随机数，不可合并成一次。**
 3. **`flag` 的语义是"这一 tick 刚发生一次变亮"**，`getToWhite` 平时为 0，故变亮事件时 `flag` 基本恒为真 → 增益事件率 ≈ `1/160 × 1/8 ≈ 1/1280` tick，约 32 秒一次。
 
 由此得到的实际行为：`expand/push` 在绝大多数时间**稳在 1 / 0**，只有偶发事件才短暂抬升。
@@ -360,10 +391,22 @@ else
     randomTalkVector *= 0.9f;
 ```
 
-进入 `Radius()` 的 `-0.5 * averageVoice` 项 → **说话时光环整体收缩**（最大 -0.5 半径单位 = -5px × expand）。
+进入 `Radius()` 的 `-0.5 * averageVoice` 项 → 若生效则是说话时光环整体收缩（最大 -0.5 半径单位 = -5px × expand）。
 
-> ⚠️ `Update` 尾段存在把 `voiceFreqSamples` 清零、`averageVoice = 0` 的分支，
-> 与 `DrawSprites` 的调用顺序可能使该项实际恒为 0。**待定案**。
+> **已定案：该项实际恒为 0，是死参数。** 紧接上文的同一方法内：
+
+```csharp
+if (averageVoice > 0f) {
+    for (i = 0; i < voiceFreqSamples.Length; i++) voiceFreqSamples[i] = 0f;
+    averageVoice = 0f;                       // ← 用完立刻清零
+}
+```
+
+> 计算与清零都在 `OracleGraphics.Update` 里完成，而 `Radius` 只在 `Halo.DrawSprites`
+> 中被调用；游戏内 Update 先于 DrawSprites，因此绘制时读到的 `averageVoice` 恒为 0。
+> → 参考实现固定 `voice = 0` 与原版一致。
+>
+> 可证伪条件：若游戏内 FP 讲话时能观察到光环随语音收缩，则上述调用顺序假设有误。
 
 ---
 
@@ -381,22 +424,29 @@ else
 外环直径：**p50 80px**，p95 约 100~124px，峰值（事件时）可到 200px。
 → 在 1400×800 房间里，光环是**小尺寸高密度**的细节，不是视觉主体。
 
-> ⚠️ 早期版本曾报 `push` 均值 1.35、p50=1，使半径整体偏大 10px。原因是把
-> §5.5 的增益条件写成了 `rnd>=0.5 && flag`（取反）且把 `Random.Range(-1,0)`
-> 当成只返回 -1。按 IL 订正后 `push` 有 95% 的时间为 0，环半径回到
-> 恒定的 30 / 40。**旧视频（`halo2139.mp4` / `_v2` / `_v3`）的环略偏大，
-> 以本表为准。**
+> ⚠️ 本表订正过两次，记录在此以免再犯：
+> 1. 增益条件曾写成 `rnd>=0.5 && flag`（把 IL 的 `blt` 判反），使 `push` 均值达 1.35、
+>    p50=1，半径整体偏大 10px。
+> 2. `Random.Range(int,int)` **上界不含**（MemberRef 签名字节 `00 02 08 08 08` =
+>    `(int32,int32)->int32`），故 `Range(-1,0)` **恒为 -1**，`Range(1,6)` = 1..5 →
+>    `getToPush ∈ 0..4`，均值 2.0。曾误当作 `{-1,0}` 并让上界含 5，使取值变成 0..5、均值 2.5。
+>
+> 订正后 `push` 有 95% 的时间为 0，环半径回到恒定的 30 / 40。**旧视频
+> （`halo2139.mp4` / `_v2` / `_v3`）的环略偏大，以本表为准。**
 
 ---
 
-## 7. 未闭合项（需游戏内截图定案）
+## 7. 未闭合项
 
-1. **`averageVoice` 是否真的生效**：见 §5.7 的零化分支。
+1. ~~`averageVoice` 是否真的生效~~ —— **已定案：恒为 0，是死参数**，见 §5.7。
 2. **`white=1` 的实心盘**是否符合游戏观感（代码如此，直觉存疑）。
 3. **后处理**：`VectorCircle` 自身无 bloom/tint；若游戏内观感更"亮"，来源在房间后期处理链（`DeepProcessing` 等），与本类无关。
-4. **`oracle.arm.cornerPositions` 的具体值**：影响 `stuckAt` 的 Clamp 包围盒，未提取。
+4. **`oracle.arm.cornerPositions` 的具体值**：决定 `stuckAt` 的夹取强度，是**唯一仍未
+   闭合的几何量**。`tools/halo2139_sim.py` 已将它暴露为 `arm_box` 参数（默认 `None`
+   = 不夹），但真实数值取决于 FP 房间内手臂包围盒的实测值，需游戏内测距。
 5. ~~bit 长轴朝向~~ —— **已定案：切向**，见 §4.2。渲染器默认
    `--bit-axis tangential`，`radial` 保留为对照开关。
+6. ~~`Random.Range` 重载~~ —— **已定案：`Range(int,int)`，上界不含**，见 §6。
 
 ---
 

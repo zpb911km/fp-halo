@@ -185,8 +185,10 @@ function step(h) {
     }
     if (Math.random() < 1 / 160 || flag) {
         if (Math.random() < 0.5 && flag)
-            // Range(-1,0) + Range(1,6) = 0..5（两个区间各消耗一次随机数）
-            h.getToPush = (Math.floor(Math.random() * 2) - 1)
+            // Random.Range(int,int) 上界不含（签名字节 00 02 08 08 08）：
+            //   Range(-1, 0) 恒为 -1，Range(1, 6) 为 1..5 → getToPush ∈ 0..4
+            // Math.random()*1 取整恒为 0，只为保持"两次 Range 各消耗一次随机数"。
+            h.getToPush = (Math.floor(Math.random() * 1) - 1)
                         + (Math.floor(Math.random() * 5) + 1);
         else
             h.getToPush = 0;

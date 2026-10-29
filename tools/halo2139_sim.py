@@ -124,17 +124,47 @@ class MemoryBit:
 
 
 class Connection:
-    """一条神经连线：从房间边框甩进来，终点精确停在 halo 外缘。"""
+    """一条神经连线：锚点在房间中心外 300~500px，终点精确停在 halo 外缘。
 
-    def __init__(self, cx, cy):
-        a = random.random() * math.tau
-        r = random.uniform(300, 500)                       # 锚点距离
-        self.stuck_at = (cx + math.cos(a) * r, cy + math.sin(a) * r)
-        # handle = stuck_at + Custom.RNV() * Lerp(400, 700, Random.value)
-        ha = random.random() * math.tau
-        hr = random.uniform(400, 700)
-        self.handle = (self.stuck_at[0] + math.cos(ha) * hr,
-                       self.stuck_at[1] + math.sin(ha) * hr)
+    IL 依据——调用方 ``Halo::.ctor``::
+
+        pos = 房间中心 + RNV() * Lerp(300, 500, Random.value)
+        new Connection(this, pos)
+
+    构造器 ``Halo.Connection::.ctor(parent, pos)``::
+
+        p = pos
+        p.x = Clamp(p.x, arm.cornerPositions[0].x, arm.cornerPositions[1].x)
+        p.y = Clamp(p.y, arm.cornerPositions[2].y, arm.cornerPositions[1].y)
+        stuckAt = Lerp(pos, p, 0.5)      # 落在手臂包围盒内则原样，否则取中点
+        handle  = pos + RNV() * Lerp(400, 700, Random.value)
+
+    注意 handle 的基点是被夹之前的 ``pos``，不是 ``stuckAt``。
+
+    ``arm_box`` 为 None 时不做夹取（等价于假设锚点都落在手臂包围盒内）。原版的
+    手臂包围盒由 ``OracleArm::.ctor/Update`` 按关节位置逐帧算出，随手臂动画变化，
+    无法只从 Halo 的 IL 复现，因此留作外部参数。
+
+    格式为**两个角点** ``((x0, y0), (x1, y1))``，不是四元组 ``(x0, y0, x1, y1)``。
+    夹取不消耗随机数，因此开/关 ``arm_box`` 不改变后续随机流（可逐帧对拍）。
+    """
+
+    def __init__(self, cx, cy, arm_box=None):
+        a = random.random() * math.tau                     # RNV()：第 1 个随机数
+        r = L(300.0, 500.0, random.random())               # 第 2 个
+        pos = (cx + math.cos(a) * r, cy + math.sin(a) * r)
+        if arm_box is None:
+            self.stuck_at = pos
+        else:
+            (x0, y0), (x1, y1) = arm_box
+            clamped = (min(max(pos[0], x0), x1),
+                       min(max(pos[1], y0), y1))
+            self.stuck_at = (L(pos[0], clamped[0], 0.5),
+                             L(pos[1], clamped[1], 0.5))
+        ha = random.random() * math.tau                    # RNV()：第 3 个
+        hr = L(400.0, 700.0, random.random())              # 第 4 个
+        self.handle = (pos[0] + math.cos(ha) * hr,
+                       pos[1] + math.sin(ha) * hr)
         self.light_up = 0.0
         self.last_light_up = 0.0
 
@@ -142,9 +172,9 @@ class Connection:
 class Halo:
     RING_BITS = (10, 30, 60)
 
-    def __init__(self, cx, cy):
+    def __init__(self, cx, cy, arm_box=None):
         self.center = (cx, cy)
-        self.connections = [Connection(cx, cy) for _ in range(20)]
+        self.connections = [Connection(cx, cy, arm_box) for _ in range(20)]
         self.fire_chance = random.random() ** 3
         self.bits = [[MemoryBit() for _ in range(n)] for n in self.RING_BITS]
         self.rot = [[0.0] * 5 for _ in range(10)]  # cur, last, start, target, progress
@@ -210,8 +240,11 @@ class Halo:
                 self.get_to_expand = 1.0
         if random.random() < 1 / 160 or flag:
             if random.random() < 0.5 and flag:
-                # Range(-1,0) 含 0；Range(1,6) 为 1..5 → 取值 0..5，均值 2.5
-                self.get_to_push = float(random.randrange(-1, 1)
+                # Random.Range(int,int) 上界不含（签名字节 00 02 08 08 08）：
+                #   Range(-1, 0) 恒为 -1，Range(1, 6) 为 1..5
+                #   → getToPush ∈ 0..4，均值 2
+                # 两次调用各消耗一个随机数，故仍写两次 randrange。
+                self.get_to_push = float(random.randrange(-1, 0)
                                          + random.randrange(1, 6))
             else:
                 self.get_to_push = 0.0
@@ -335,16 +368,24 @@ def room_bg(p, size):
 
 # ---------------------------------------------------------------- CLI
 
-def build(seed=2139, warmup=3000, cx=700.0, cy=400.0):
+def _box_from_cli(v):
+    """CLI 的四元组 (x0,y0,x1,y1) → build() 的两角点格式 ((x0,y0),(x1,y1))。"""
+    if not v:
+        return None
+    x0, y0, x1, y1 = v
+    return ((x0, y0), (x1, y1))
+
+
+def build(seed=2139, warmup=3000, cx=700.0, cy=400.0, arm_box=None):
     random.seed(seed)
-    halo = Halo(cx, cy)
+    halo = Halo(cx, cy, arm_box)
     for _ in range(warmup):   # 跳过冷启动
         halo.update()
     return halo
 
 
 def cmd_still(a):
-    halo = build(a.seed, a.warmup, a.cx, a.cy)
+    halo = build(a.seed, a.warmup, a.cx, a.cy, _box_from_cli(a.arm_box))
     for _ in range(a.ticks):
         halo.update()
     img = render(halo, 1.0, (a.cx, a.cy), (a.w, a.h), a.zoom, room_bg, a.ss,
@@ -358,7 +399,7 @@ def cmd_still(a):
 
 def cmd_video(a):
     tmp = tempfile.mkdtemp(prefix="halo2139_")
-    halo = build(a.seed, a.warmup, a.cx, a.cy)
+    halo = build(a.seed, a.warmup, a.cx, a.cy, _box_from_cli(a.arm_box))
     step = 40.0 / a.fps                 # 逻辑 40 tick/s，每帧推进多少 tick
     acc = 0.0
     for f in range(a.frames):
@@ -383,7 +424,7 @@ def cmd_video(a):
 
 
 def cmd_stats(a):
-    halo = build(a.seed, a.warmup, a.cx, a.cy)
+    halo = build(a.seed, a.warmup, a.cx, a.cy, _box_from_cli(a.arm_box))
     keys = ("R0", "R1", "expand", "push", "white")
     samples = {k: [] for k in keys}
     lit = 0
@@ -426,6 +467,10 @@ def main(argv=None):
                        choices=("radial", "tangential"),
                        help="bit 长边取向：tangential=8px 沿切向(默认,已定案) / "
                             "radial=8px 沿半径(对照用)")
+        p.add_argument("--arm-box", dest="arm_box", type=float, nargs=4,
+                       default=None, metavar=("X0", "Y0", "X1", "Y1"),
+                       help="手臂包围盒两角点，用于把连线锚点夹回盒内（缺省不夹取，"
+                            "见 SPEC 4.3.1 的强度实测表）")
 
     p = sub.add_parser("still", help="输出单帧 PNG")
     common(p)
@@ -444,6 +489,9 @@ def main(argv=None):
     p.add_argument("--seed", type=int, default=2139)
     p.add_argument("--warmup", type=int, default=3000)
     p.add_argument("--ticks", type=int, default=20000)
+    p.add_argument("--arm-box", dest="arm_box", type=float, nargs=4,
+                   default=None, metavar=("X0", "Y0", "X1", "Y1"),
+                   help="手臂包围盒两角点（缺省不夹取，见 SPEC 4.3.1）")
     p.add_argument("--cx", type=float, default=700.0)
     p.add_argument("--cy", type=float, default=400.0)
     p.set_defaults(func=cmd_stats)
